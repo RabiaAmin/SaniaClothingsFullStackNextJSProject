@@ -1,20 +1,34 @@
+'use client';
+
+import { useState } from 'react';
+import AuthGuard from '@/components/auth/AuthGuard';
 import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 
-/**
- * Admin shell — applies to all routes under (admin)/.
- * Add auth guard here once AuthContext is wired up.
- */
 export default function AdminLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex flex-1 flex-col">
-        <Navbar />
-        <main className="flex-1 px-6 py-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
-        </main>
+    <AuthGuard>
+      <div className="flex h-screen overflow-hidden bg-background">
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Navbar onMenuClick={() => setSidebarOpen((v) => !v)} />
+          <main className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">{children}</div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }
