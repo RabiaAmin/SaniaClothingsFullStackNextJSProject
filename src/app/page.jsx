@@ -54,7 +54,10 @@ export default function HomePage() {
       <section className="border-t bg-muted/40 px-4 py-20">
         <div className="container mx-auto grid gap-8 sm:grid-cols-3">
           {features.map(({ icon: Icon, title, description }) => (
-            <div key={title} className="flex flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
+            <div
+              key={title}
+              className="flex flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm"
+            >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <Icon className="h-5 w-5 text-primary" />
               </div>

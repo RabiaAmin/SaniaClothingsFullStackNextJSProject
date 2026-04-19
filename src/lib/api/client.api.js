@@ -1,39 +1,52 @@
 import axiosInstance from './axiosInstance';
 
-const CLIENTS = '/clients';
+// Base path: /api/v1/client (baseURL already includes /api/v1 via NEXT_PUBLIC_API_URL)
+const CLIENT = '/client';
 
 /**
- * Client API module
- *
  * @typedef {Object} ClientPayload
- * @property {string}  name
- * @property {string}  email
- * @property {string}  [phone]
+ * @property {string}  name                  — required on create
+ * @property {string}  [email]
+ * @property {string}  [phone]               — mobile number
+ * @property {string}  [telphone]            — telephone number
  * @property {string}  [address]
+ * @property {string}  [registrationNumber]  — company registration number
  * @property {string}  [vatNumber]
+ * @property {string}  [fax]
+ * @property {boolean} [vatApplicable]       — whether VAT applies to this client
+ * @property {number}  [vatRate]             — VAT percentage, e.g. 15
  */
+
 const clientApi = {
-  /** List clients. Optional query params: search, page, limit */
-  getClients: (params) => axiosInstance.get(CLIENTS, { params }),
-
-  /** @param {string} id */
-  getClientById: (id) => axiosInstance.get(`${CLIENTS}/${id}`),
-
-  /** @param {ClientPayload} payload */
-  createClient: (payload) => axiosInstance.post(CLIENTS, payload),
+  /**
+   * GET /api/v1/client/getAll — auth required
+   */
+  getAllClients: () => axiosInstance.get(`${CLIENT}/getAll`),
 
   /**
-   * @param {string} id
-   * @param {Partial<ClientPayload>} payload
+   * @param {string} id — MongoDB _id of the client
+   * GET /api/v1/client/get/:id — auth required
    */
-  updateClient: (id, payload) => axiosInstance.put(`${CLIENTS}/${id}`, payload),
+  getClientById: (id) => axiosInstance.get(`${CLIENT}/get/${id}`),
 
-  /** @param {string} id */
-  deleteClient: (id) => axiosInstance.delete(`${CLIENTS}/${id}`),
+  /**
+   * @param {ClientPayload} payload
+   * POST /api/v1/client/add — auth required
+   */
+  addClient: (payload) => axiosInstance.post(`${CLIENT}/add`, payload),
 
-  /** Invoices for a specific client */
-  getClientInvoices: (id, params) =>
-    axiosInstance.get(`${CLIENTS}/${id}/invoices`, { params }),
+  /**
+   * @param {string} id — MongoDB _id of the client
+   * @param {Partial<ClientPayload>} payload — all fields optional
+   * PUT /api/v1/client/update/:id — auth required
+   */
+  updateClient: (id, payload) => axiosInstance.put(`${CLIENT}/update/${id}`, payload),
+
+  /**
+   * @param {string} id — MongoDB _id of the client
+   * DELETE /api/v1/client/delete/:id — auth required
+   */
+  deleteClient: (id) => axiosInstance.delete(`${CLIENT}/delete/${id}`),
 };
 
 export default clientApi;

@@ -40,9 +40,7 @@ function reducer(state, action) {
     case 'UPDATE_TOAST':
       return {
         ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
+        toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
       };
 
     case 'DISMISS_TOAST': {
@@ -92,8 +90,7 @@ export function toast({ duration = 5000, ...props }) {
   const id = genId();
 
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });
-  const update = (updateProps) =>
-    dispatch({ type: 'UPDATE_TOAST', toast: { ...updateProps, id } });
+  const update = (updateProps) => dispatch({ type: 'UPDATE_TOAST', toast: { ...updateProps, id } });
 
   dispatch({
     type: 'ADD_TOAST',

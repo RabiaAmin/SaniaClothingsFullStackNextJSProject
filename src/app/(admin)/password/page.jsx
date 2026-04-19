@@ -13,20 +13,20 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Loader2, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 const RULES = [
-  { label: 'At least 8 characters',  test: (v) => v.length >= 8       },
-  { label: 'Contains a letter',       test: (v) => /[a-zA-Z]/.test(v) },
-  { label: 'Contains a number',       test: (v) => /\d/.test(v)       },
+  { label: 'At least 8 characters', test: (v) => v.length >= 8 },
+  { label: 'Contains a letter', test: (v) => /[a-zA-Z]/.test(v) },
+  { label: 'Contains a number', test: (v) => /\d/.test(v) },
 ];
 
 const EMPTY = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
 export default function PasswordPage() {
-  const [form, setForm]         = useState(EMPTY);
-  const [show, setShow]         = useState({ current: false, newP: false, confirm: false });
-  const [saving, setSaving]     = useState(false);
-  const [success, setSuccess]   = useState(false);
-  const [error, setError]       = useState('');
-  const [touched, setTouched]   = useState(false);
+  const [form, setForm] = useState(EMPTY);
+  const [show, setShow] = useState({ current: false, newP: false, confirm: false });
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [touched, setTouched] = useState(false);
 
   function set(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
@@ -35,7 +35,9 @@ export default function PasswordPage() {
     setSuccess(false);
   }
 
-  function toggle(k) { setShow((p) => ({ ...p, [k]: !p[k] })); }
+  function toggle(k) {
+    setShow((p) => ({ ...p, [k]: !p[k] }));
+  }
 
   const passing = RULES.filter((r) => r.test(form.newPassword)).length;
 
@@ -51,14 +53,17 @@ export default function PasswordPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     const err = validate();
-    if (err) { setError(err); return; }
+    if (err) {
+      setError(err);
+      return;
+    }
 
     setSaving(true);
     setError('');
     try {
       await authApi.changePassword({
         currentPassword: form.currentPassword,
-        newPassword:     form.newPassword,
+        newPassword: form.newPassword,
       });
       setSuccess(true);
       setForm(EMPTY);
@@ -102,10 +107,7 @@ export default function PasswordPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Password Manager"
-        description="Update your account password"
-      />
+      <PageHeader title="Password Manager" description="Update your account password" />
 
       <div className="mx-auto max-w-lg space-y-6">
         {/* Security tip */}
@@ -185,7 +187,9 @@ export default function PasswordPage() {
                             key={rule.label}
                             className={`flex items-center gap-1.5 text-xs ${ok ? 'text-green-600' : 'text-muted-foreground'}`}
                           >
-                            <CheckCircle2 className={`h-3 w-3 ${ok ? 'opacity-100' : 'opacity-30'}`} />
+                            <CheckCircle2
+                              className={`h-3 w-3 ${ok ? 'opacity-100' : 'opacity-30'}`}
+                            />
                             {rule.label}
                           </li>
                         );
@@ -204,7 +208,9 @@ export default function PasswordPage() {
               {form.confirmPassword && (
                 <p
                   className={`-mt-3 text-xs ${
-                    form.newPassword === form.confirmPassword ? 'text-green-600' : 'text-destructive'
+                    form.newPassword === form.confirmPassword
+                      ? 'text-green-600'
+                      : 'text-destructive'
                   }`}
                 >
                   {form.newPassword === form.confirmPassword
@@ -215,7 +221,9 @@ export default function PasswordPage() {
 
               <Button type="submit" className="w-full" disabled={saving}>
                 {saving ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Updating…</>
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Updating…
+                  </>
                 ) : (
                   'Update Password'
                 )}

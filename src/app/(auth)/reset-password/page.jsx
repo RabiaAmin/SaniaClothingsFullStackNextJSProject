@@ -119,7 +119,9 @@ function ResetPasswordForm() {
           </button>
         </div>
         {formData.password && (
-          <p className={`flex items-center gap-1 text-xs ${passwordOk ? 'text-green-600' : 'text-muted-foreground'}`}>
+          <p
+            className={`flex items-center gap-1 text-xs ${passwordOk ? 'text-green-600' : 'text-muted-foreground'}`}
+          >
             <CheckCircle2 className={`h-3 w-3 ${passwordOk ? 'opacity-100' : 'opacity-30'}`} />
             At least 8 characters
           </p>

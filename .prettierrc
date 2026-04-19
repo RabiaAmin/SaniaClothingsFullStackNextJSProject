@@ -9,10 +9,5 @@
   "bracketSameLine": false,
   "arrowParens": "always",
   "endOfLine": "lf",
-  "importOrder": [
-    "^(react|next)(.*)$",
-    "<THIRD_PARTY_MODULES>",
-    "^@/(.*)$",
-    "^[./]"
-  ]
+  "importOrder": ["^(react|next)(.*)$", "<THIRD_PARTY_MODULES>", "^@/(.*)$", "^[./]"]
 }

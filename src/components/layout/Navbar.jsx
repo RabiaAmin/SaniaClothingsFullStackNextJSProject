@@ -31,7 +31,7 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
   const initials =
     user?.firstName && user?.lastName
       ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-      : user?.email?.[0]?.toUpperCase() ?? 'U';
+      : (user?.email?.[0]?.toUpperCase() ?? 'U');
 
   /* ── Public / marketing navbar ─────────────────────────────────────────── */
   if (variant === 'public') {
@@ -56,8 +56,12 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
-            <Button asChild size="sm"><Link href="/register">Get started</Link></Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/login">Sign in</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/register">Get started</Link>
+            </Button>
           </div>
         </div>
       </header>
@@ -98,9 +102,7 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
               <p className="text-sm font-medium leading-none">
                 {user?.firstName ?? user?.email ?? 'User'}
               </p>
-              {user?.firstName && (
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              )}
+              {user?.firstName && <p className="text-xs text-muted-foreground">{user.email}</p>}
             </div>
           </button>
         </DropdownMenuTrigger>

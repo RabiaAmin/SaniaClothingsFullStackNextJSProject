@@ -6,10 +6,10 @@
 /**
  * Format a number as currency.
  * @param {number} amount
- * @param {string} currency – ISO 4217 code, default "USD"
+ * @param {string} currency – ISO 4217 code, default "ZAR"
  * @param {string} locale
  */
-export function formatCurrency(amount, currency = 'USD', locale = 'en-US') {
+export function formatCurrency(amount, currency = 'ZAR', locale = 'en-US') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,

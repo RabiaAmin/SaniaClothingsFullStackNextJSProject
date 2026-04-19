@@ -16,11 +16,7 @@ export default function TableSkeleton({ rows = 5, cols = 5 }) {
       {Array.from({ length: rows }).map((_, r) => (
         <div key={r} className="flex gap-4 py-2">
           {Array.from({ length: cols }).map((_, c) => (
-            <Skeleton
-              key={c}
-              className="h-4 flex-1 rounded"
-              style={{ opacity: 1 - r * 0.12 }}
-            />
+            <Skeleton key={c} className="h-4 flex-1 rounded" style={{ opacity: 1 - r * 0.12 }} />
           ))}
         </div>
       ))}

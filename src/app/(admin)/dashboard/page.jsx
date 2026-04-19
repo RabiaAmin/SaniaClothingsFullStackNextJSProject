@@ -3,9 +3,16 @@
 import { useFetch } from '@/hooks/useFetch';
 import invoiceApi from '@/lib/api/invoice.api';
 import clientApi from '@/lib/api/client.api';
-import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { formatCurrency } from '@/lib/utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import StatusBadge from '@/components/admin/StatusBadge';
 import TableSkeleton from '@/components/admin/TableSkeleton';
 import PageHeader from '@/components/admin/PageHeader';
@@ -14,9 +21,10 @@ import { FileText, Users, DollarSign, TrendingUp, AlertCircle, Plus } from 'luci
 import Link from 'next/link';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function normalizeList(data) {
+function normalizeList(data, key) {
   if (!data) return [];
   if (Array.isArray(data)) return data;
+  if (key && Array.isArray(data[key])) return data[key];
   if (Array.isArray(data.data)) return data.data;
   return [];
 }
@@ -51,7 +59,10 @@ function StatusBar({ label, count, total, colorClass }) {
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className={`h-2 rounded-full transition-all ${colorClass}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-2 rounded-full transition-all ${colorClass}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -59,32 +70,30 @@ function StatusBar({ label, count, total, colorClass }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { data: invoicesRaw, isLoading: loadingInv, error: errInv } = useFetch(
-    () => invoiceApi.getInvoices({ limit: 100 })
-  );
-  const { data: clientsRaw, isLoading: loadingCli } = useFetch(
-    () => clientApi.getClients({ limit: 100 })
-  );
+  const {
+    data: invoicesRaw,
+    isLoading: loadingInv,
+    error: errInv,
+  } = useFetch(() => invoiceApi.getAllInvoices());
+  const { data: clientsRaw, isLoading: loadingCli } = useFetch(() => clientApi.getAllClients());
 
-  const invoices = normalizeList(invoicesRaw);
-  const clients  = normalizeList(clientsRaw);
+  const invoices = normalizeList(invoicesRaw, 'invoices');
+  const clients = normalizeList(clientsRaw, 'clients');
 
-  // Derive stats
-  const paid    = invoices.filter((i) => i.status === 'paid');
-  const pending = invoices.filter((i) => i.status === 'sent');
-  const overdue = invoices.filter((i) => i.status === 'overdue');
-  const draft   = invoices.filter((i) => i.status === 'draft');
+  // Derive stats — API statuses are "Paid", "Sent", "Pending" (capitalised)
+  const paid = invoices.filter((i) => i.status === 'Paid');
+  const pending = invoices.filter((i) => i.status === 'Pending');
+  const sent = invoices.filter((i) => i.status === 'Sent');
 
-  const totalRevenue   = paid.reduce((s, i) => s + (i.total ?? 0), 0);
-  const pendingRevenue = pending.reduce((s, i) => s + (i.total ?? 0), 0);
+  const totalRevenue = paid.reduce((s, i) => s + (i.totalAmount ?? 0), 0);
+  const pendingRevenue = pending.reduce((s, i) => s + (i.totalAmount ?? 0), 0);
 
   // Recent 5 invoices
   const recent = [...invoices]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5);
 
-  // Client map for name lookup
-  const clientMap = Object.fromEntries(clients.map((c) => [c.id, c.name]));
+  const clientMap = Object.fromEntries(clients.map((c) => [c._id, c.name]));
 
   const isLoading = loadingInv || loadingCli;
 
@@ -116,7 +125,7 @@ export default function DashboardPage() {
           label="Total Invoices"
           value={isLoading ? '—' : invoices.length}
           icon={FileText}
-          sub={`${draft.length} draft`}
+          sub={`${sent.length} sent`}
         />
         <StatCard
           label="Total Revenue"
@@ -158,14 +167,30 @@ export default function DashboardPage() {
               </div>
             ) : (
               <>
-                <StatusBar label="Paid"    count={paid.length}    total={invoices.length} colorClass="bg-green-500" />
-                <StatusBar label="Sent"    count={pending.length} total={invoices.length} colorClass="bg-blue-500"  />
-                <StatusBar label="Overdue" count={overdue.length} total={invoices.length} colorClass="bg-red-500"   />
-                <StatusBar label="Draft"   count={draft.length}   total={invoices.length} colorClass="bg-slate-400" />
+                <StatusBar
+                  label="Paid"
+                  count={paid.length}
+                  total={invoices.length}
+                  colorClass="bg-green-500"
+                />
+                <StatusBar
+                  label="Sent"
+                  count={sent.length}
+                  total={invoices.length}
+                  colorClass="bg-blue-500"
+                />
+                <StatusBar
+                  label="Pending"
+                  count={pending.length}
+                  total={invoices.length}
+                  colorClass="bg-amber-400"
+                />
                 <div className="border-t pt-3 text-sm">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Pending revenue</span>
-                    <span className="font-medium text-foreground">{formatCurrency(pendingRevenue)}</span>
+                    <span className="font-medium text-foreground">
+                      {formatCurrency(pendingRevenue)}
+                    </span>
                   </div>
                 </div>
               </>
@@ -200,15 +225,13 @@ export default function DashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {recent.map((inv) => (
-                    <TableRow key={inv.id}>
+                    <TableRow key={inv._id}>
                       <TableCell className="font-mono text-xs font-semibold">
-                        {inv.invoiceNumber ?? `#${inv.id?.slice(0, 6)}`}
+                        {inv.invoiceNumber ?? `#${inv._id?.slice(-6)}`}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {clientMap[inv.clientId] ?? inv.clientName ?? '—'}
-                      </TableCell>
+                      <TableCell className="text-sm">{clientMap[inv.toClient] ?? '—'}</TableCell>
                       <TableCell className="font-medium">
-                        {formatCurrency(inv.total ?? 0)}
+                        {formatCurrency(inv.totalAmount ?? 0)}
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={inv.status} />

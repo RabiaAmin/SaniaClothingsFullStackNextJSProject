@@ -1,47 +1,40 @@
 import axiosInstance from './axiosInstance';
 
-const BUSINESSES = '/businesses';
+// Base path: /api/v1/business (baseURL already includes /api/v1 via NEXT_PUBLIC_API_URL)
+// The system supports ONE business record only — create once, update as needed.
+const BUSINESS = '/business';
 
 /**
- * Business Profile API module
- *
  * @typedef {Object} BusinessPayload
- * @property {string}  name
+ * @property {string}  name          — required on create
  * @property {string}  [email]
  * @property {string}  [phone]
+ * @property {string}  [telPhone]
  * @property {string}  [address]
  * @property {string}  [vatNumber]
- * @property {string}  [logoUrl]
- * @property {string}  [currency]   – ISO 4217, e.g. "USD"
+ * @property {string}  [ckNumber]
+ * @property {string}  [fax]
  */
+
 const businessApi = {
-  /** List all business profiles belonging to the authenticated user */
-  getBusinesses: (params) => axiosInstance.get(BUSINESSES, { params }),
-
-  /** @param {string} id */
-  getBusinessById: (id) => axiosInstance.get(`${BUSINESSES}/${id}`),
-
-  /** @param {BusinessPayload} payload */
-  createBusiness: (payload) => axiosInstance.post(BUSINESSES, payload),
+  /**
+   * GET /api/v1/business/get — auth required
+   * Returns the single business record.
+   */
+  getBusiness: () => axiosInstance.get(`${BUSINESS}/get`),
 
   /**
-   * @param {string} id
-   * @param {Partial<BusinessPayload>} payload
+   * @param {BusinessPayload} payload
+   * POST /api/v1/business/create — auth required
    */
-  updateBusiness: (id, payload) => axiosInstance.put(`${BUSINESSES}/${id}`, payload),
-
-  /** @param {string} id */
-  deleteBusiness: (id) => axiosInstance.delete(`${BUSINESSES}/${id}`),
+  createBusiness: (payload) => axiosInstance.post(`${BUSINESS}/create`, payload),
 
   /**
-   * Upload a business logo.
-   * @param {string}   id
-   * @param {FormData} formData  – field name: "logo"
+   * @param {Partial<BusinessPayload>} payload — all fields optional
+   * PUT /api/v1/business/update — auth required
+   * Updates the single existing business record.
    */
-  uploadLogo: (id, formData) =>
-    axiosInstance.post(`${BUSINESSES}/${id}/logo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+  updateBusiness: (payload) => axiosInstance.put(`${BUSINESS}/update`, payload),
 };
 
 export default businessApi;

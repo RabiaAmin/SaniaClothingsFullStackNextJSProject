@@ -199,7 +199,9 @@ export default function RegisterPage() {
                         key={rule.label}
                         className={`flex items-center gap-1.5 text-xs ${pass ? 'text-green-600' : 'text-muted-foreground'}`}
                       >
-                        <CheckCircle2 className={`h-3 w-3 ${pass ? 'opacity-100' : 'opacity-30'}`} />
+                        <CheckCircle2
+                          className={`h-3 w-3 ${pass ? 'opacity-100' : 'opacity-30'}`}
+                        />
                         {rule.label}
                       </li>
                     );

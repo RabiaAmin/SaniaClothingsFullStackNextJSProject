@@ -20,12 +20,12 @@ import {
 import { useState } from 'react';
 
 const NAV_ITEMS = [
-  { href: '/dashboard',     label: 'Dashboard',        icon: LayoutDashboard },
-  { href: '/invoices',      label: 'Invoice Manager',  icon: FileText        },
-  { href: '/clients',       label: 'Client Manager',   icon: Users           },
-  { href: '/business',      label: 'Business Profile', icon: Building2       },
-  { href: '/bank-accounts', label: 'Bank Accounts',    icon: CreditCard      },
-  { href: '/password',      label: 'Password Manager', icon: KeyRound        },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/invoices', label: 'Invoice Manager', icon: FileText },
+  { href: '/clients', label: 'Client Manager', icon: Users },
+  { href: '/business', label: 'Business Profile', icon: Building2 },
+  { href: '/bank-accounts', label: 'Bank Accounts', icon: CreditCard },
+  { href: '/password', label: 'Password Manager', icon: KeyRound },
 ];
 
 export default function Sidebar({ open = false, onClose }) {
@@ -50,11 +50,11 @@ export default function Sidebar({ open = false, onClose }) {
   const initials =
     user?.firstName && user?.lastName
       ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-      : user?.email?.[0]?.toUpperCase() ?? 'U';
+      : (user?.email?.[0]?.toUpperCase() ?? 'U');
 
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName ?? ''}`.trim()
-    : user?.email ?? 'User';
+    : (user?.email ?? 'User');
 
   return (
     <aside
