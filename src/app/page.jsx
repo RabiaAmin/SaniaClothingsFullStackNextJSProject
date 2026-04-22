@@ -41,7 +41,7 @@ export default function HomePage() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg">
             <Link href="/register">
-              Get started free <ArrowRight className="ml-2 h-4 w-4" />
+              Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
