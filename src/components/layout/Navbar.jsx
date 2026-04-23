@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -15,12 +16,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Menu, Zap, Settings, LogOut, User } from 'lucide-react';
+import { Menu, Scissors, Zap, Settings, LogOut, User, X } from 'lucide-react';
 
 export default function Navbar({ variant = 'admin', onMenuClick }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleLogout() {
     await logout().catch(() => {});
@@ -35,14 +37,24 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
 
   /* ── Public / marketing navbar ─────────────────────────────────────────── */
   if (variant === 'public') {
+    const navLinks = [
+      { href: '/about', label: 'About' },
+      { href: '/services', label: 'Services' },
+      { href: '/contact', label: 'Contact' },
+    ];
+
     return (
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 font-bold text-primary">
-            <Zap className="h-4 w-4" /> Invoicer
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-2 font-bold text-foreground">
+            <Scissors className="h-4 w-4 text-primary" />
+            <span>Sania Clothing</span>
           </Link>
+
+          {/* Desktop nav */}
           <nav className="hidden items-center gap-6 text-sm md:flex">
-            {[{ href: '/about', label: 'About' }].map(({ href, label }) => (
+            {navLinks.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -55,15 +67,51 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Sign in</Link>
-            </Button>
+
+          {/* Desktop CTA */}
+          <div className="hidden items-center gap-2 md:flex">
             <Button asChild size="sm">
-              <Link href="/register">Get started</Link>
+              <Link href="/contact">Get in Touch</Link>
             </Button>
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+            aria-label="Toggle menu"
+            onClick={() => setMobileOpen((o) => !o)}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
+
+        {/* Mobile menu */}
+        {mobileOpen && (
+          <div className="border-t bg-background px-4 py-4 md:hidden">
+            <nav className="flex flex-col gap-1">
+              {navLinks.map(({ href, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    'rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                    pathname === href && 'bg-accent font-medium text-foreground'
+                  )}
+                >
+                  {label}
+                </Link>
+              ))}
+              <div className="mt-3 border-t pt-3">
+                <Button asChild size="sm" className="w-full">
+                  <Link href="/contact" onClick={() => setMobileOpen(false)}>
+                    Get in Touch
+                  </Link>
+                </Button>
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
     );
   }
