@@ -46,13 +46,23 @@ export default function AboutPage() {
   return (
     <div className="flex flex-col">
       {/* Page header */}
-      <section className="border-b bg-muted/40 px-4 py-20 text-center">
-        <div className="container mx-auto max-w-2xl">
-          <span className="mb-4 inline-block rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+      <section className="relative overflow-hidden border-b bg-sidebar px-4 py-24 text-center">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden select-none"
+        >
+          <span className="whitespace-nowrap text-[18vw] font-black uppercase leading-none tracking-widest text-white/[0.04]">
+            ABOUT
+          </span>
+        </div>
+        <div className="relative container mx-auto max-w-2xl">
+          <span className="mb-4 inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
             About Us
           </span>
-          <h1 className="mb-4 text-4xl font-bold tracking-tight">Built on Quality &amp; Trust</h1>
-          <p className="text-lg text-muted-foreground">
+          <h1 className="mb-4 text-4xl font-bold tracking-tight text-white">
+            Built on Quality &amp; Trust
+          </h1>
+          <p className="text-lg text-white/50">
             Sania Clothing has been a reliable garment manufacturing partner for over a decade,
             serving brands and businesses with precision cutting, trimming, and custom CMT services.
           </p>

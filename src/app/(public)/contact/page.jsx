@@ -33,41 +33,21 @@ export default function ContactPage() {
   return (
     <div className="flex flex-col">
       {/* Page header */}
-      <section className="relative overflow-hidden border-b bg-muted/40 px-4 py-20 text-center">
-        {/* Thread flow — green silk waves, bold at edges, faded at center */}
+      <section className="relative overflow-hidden border-b bg-sidebar px-4 py-24 text-center">
         <div
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{
-            maskImage:'linear-gradient(90deg,black 0%,black 15%,rgba(0,0,0,.08) 38%,rgba(0,0,0,.03) 50%,rgba(0,0,0,.08) 62%,black 85%,black 100%)',
-            WebkitMaskImage:'linear-gradient(90deg,black 0%,black 15%,rgba(0,0,0,.08) 38%,rgba(0,0,0,.03) 50%,rgba(0,0,0,.08) 62%,black 85%,black 100%)',
-          }}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden select-none"
         >
-          <style>{`
-            @keyframes tf-flow1 { from{stroke-dashoffset:1800}  to{stroke-dashoffset:-1800}  }
-            @keyframes tf-flow2 { from{stroke-dashoffset:2000}  to{stroke-dashoffset:-2000}  }
-            @keyframes tf-flow4 { from{stroke-dashoffset:2200}  to{stroke-dashoffset:-2200}  }
-          `}</style>
-          <svg
-            style={{position:'absolute',inset:0,width:'100%',height:'100%'}}
-            preserveAspectRatio="xMidYMid slice"
-            viewBox="0 0 1200 280"
-            fill="none"
-          >
-            <path d="M-200 25  C80  -30 320 140 560 25  S860  -30 1100 25  S1380 140 1500 25"  stroke="hsl(142 71% 45%)" strokeWidth="1.2" strokeDasharray="2000" style={{animation:'tf-flow2 11s linear infinite 0s',   opacity:.65}} />
-            <path d="M-200 85  C100  20 360 200 600 85  S900   20 1150 85  S1420 200 1500 85"  stroke="hsl(142 71% 45%)" strokeWidth="2"   strokeDasharray="1800" style={{animation:'tf-flow1  9s linear infinite .6s',  opacity:.75}} />
-            <path d="M-200 145 C120  65 400 230 650 145 S950   65 1200 145"                    stroke="hsl(142 71% 45%)" strokeWidth="1.8" strokeDasharray="1800" style={{animation:'tf-flow1 10s linear infinite 2s',   opacity:.65}} />
-            <path d="M-200 200 C160 125 440 275 690 195 S980  120 1220 200"                    stroke="hsl(142 71% 45%)" strokeWidth="1.4" strokeDasharray="2200" style={{animation:'tf-flow4 13s linear infinite 1.2s', opacity:.6}}  />
-            <path d="M-200 248 C190 170 460 305 720 228 S1000 158 1240 248"                    stroke="hsl(142 71% 45%)" strokeWidth="1"   strokeDasharray="2000" style={{animation:'tf-flow2 12s linear infinite 3.5s', opacity:.5}}  />
-            <path d="M-200 -15 C210  70 430 -30 670  55 S940  135 1210  20 S1430 -25 1500 -15" stroke="hsl(142 71% 45%)" strokeWidth="0.9" strokeDasharray="2400" style={{animation:'tf-flow4 14s linear infinite 2.5s', opacity:.4}}  />
-          </svg>
+          <span className="whitespace-nowrap text-[15vw] font-black uppercase leading-none tracking-widest text-white/[0.04]">
+            CONTACT
+          </span>
         </div>
-
         <div className="relative container mx-auto max-w-2xl">
-          <span className="mb-4 inline-block rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+          <span className="mb-4 inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
             Contact
           </span>
-          <h1 className="mb-4 text-4xl font-bold tracking-tight">Get in Touch</h1>
-          <p className="text-lg text-muted-foreground">
+          <h1 className="mb-4 text-4xl font-bold tracking-tight text-white">Get in Touch</h1>
+          <p className="text-lg text-white/50">
             Have a manufacturing enquiry or want to discuss a project? Send us a message and
             we&apos;ll get back to you shortly.
           </p>

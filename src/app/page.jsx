@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Scissors, Truck, Factory, ArrowRight, CheckCircle2 } from 'lucide-react';
@@ -63,53 +64,114 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative flex flex-col items-center justify-center gap-6 overflow-hidden px-4 py-28 text-center md:py-36">
-          {/* Thread flow — green silk waves, bold at edges, faded at center */}
+        <section className="relative min-h-[92vh] overflow-hidden bg-sidebar">
+          {/* Oversized decorative background text */}
           <div
-            className="pointer-events-none absolute inset-0 overflow-hidden"
-            style={{
-              maskImage:'linear-gradient(90deg,black 0%,black 15%,rgba(0,0,0,.08) 38%,rgba(0,0,0,.03) 50%,rgba(0,0,0,.08) 62%,black 85%,black 100%)',
-              WebkitMaskImage:'linear-gradient(90deg,black 0%,black 15%,rgba(0,0,0,.08) 38%,rgba(0,0,0,.03) 50%,rgba(0,0,0,.08) 62%,black 85%,black 100%)',
-            }}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden select-none"
           >
-            <style>{`
-              @keyframes tf-flow1 { from{stroke-dashoffset:1800}  to{stroke-dashoffset:-1800}  }
-              @keyframes tf-flow2 { from{stroke-dashoffset:2000}  to{stroke-dashoffset:-2000}  }
-              @keyframes tf-flow4 { from{stroke-dashoffset:2200}  to{stroke-dashoffset:-2200}  }
-            `}</style>
-            <svg
-              style={{position:'absolute',inset:0,width:'100%',height:'100%'}}
-              preserveAspectRatio="xMidYMid slice"
-              viewBox="0 0 1200 280"
-              fill="none"
-            >
-              <path d="M-200 25  C80  -30 320 140 560 25  S860  -30 1100 25  S1380 140 1500 25"  stroke="hsl(142 71% 45%)" strokeWidth="1.2" strokeDasharray="2000" style={{animation:'tf-flow2 11s linear infinite 0s',   opacity:.65}} />
-              <path d="M-200 85  C100  20 360 200 600 85  S900   20 1150 85  S1420 200 1500 85"  stroke="hsl(142 71% 45%)" strokeWidth="2"   strokeDasharray="1800" style={{animation:'tf-flow1  9s linear infinite .6s',  opacity:.75}} />
-              <path d="M-200 145 C120  65 400 230 650 145 S950   65 1200 145"                    stroke="hsl(142 71% 45%)" strokeWidth="1.8" strokeDasharray="1800" style={{animation:'tf-flow1 10s linear infinite 2s',   opacity:.65}} />
-              <path d="M-200 200 C160 125 440 275 690 195 S980  120 1220 200"                    stroke="hsl(142 71% 45%)" strokeWidth="1.4" strokeDasharray="2200" style={{animation:'tf-flow4 13s linear infinite 1.2s', opacity:.6}}  />
-              <path d="M-200 248 C190 170 460 305 720 228 S1000 158 1240 248"                    stroke="hsl(142 71% 45%)" strokeWidth="1"   strokeDasharray="2000" style={{animation:'tf-flow2 12s linear infinite 3.5s', opacity:.5}}  />
-              <path d="M-200 -15 C210  70 430 -30 670  55 S940  135 1210  20 S1430 -25 1500 -15" stroke="hsl(142 71% 45%)" strokeWidth="0.9" strokeDasharray="2400" style={{animation:'tf-flow4 14s linear infinite 2.5s', opacity:.4}}  />
-            </svg>
+            <span className="whitespace-nowrap text-[22vw] font-black uppercase leading-none tracking-widest text-white/[0.04]">
+              SANIA
+            </span>
           </div>
-          <span className="rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-            Garment Manufacturing &amp; CMT Services
-          </span>
-          <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-            Sania Clothing
-          </h1>
-          <p className="max-w-xl text-lg text-muted-foreground">
-            Delivering quality garment manufacturing, cutting, trimming, and custom CMT services to
-            brands and businesses across the industry.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg">
-              <Link href="/contact">
-                Contact Us <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/services">Our Services</Link>
-            </Button>
+
+          {/* Three-column grid */}
+          <div className="relative z-10 mx-auto grid min-h-[92vh] max-w-screen-xl grid-cols-1 px-6 md:grid-cols-[2fr_3fr_2fr] md:px-10">
+
+            {/* ── Left column: text + CTA ── */}
+            <div className="flex flex-col justify-end gap-6 pb-14 pt-8 md:py-20 order-2 md:order-1">
+              <span className="w-fit rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
+                CMT Manufacturing
+              </span>
+
+              <div className="flex flex-col gap-2">
+                <h1 className="text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl">
+                  Crafted<br />
+                  <span className="text-primary">with Precision.</span>
+                </h1>
+                <p className="mt-2 max-w-[22ch] text-base leading-relaxed text-white/50">
+                  Inspired by craftsmanship.<br />
+                  Designed for modern brands.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3 pt-1">
+                <Button asChild size="lg" className="rounded-full px-7">
+                  <Link href="/contact">
+                    Get in Touch <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="rounded-full border-white/20 bg-transparent px-7 text-white hover:bg-white/10 hover:text-white"
+                >
+                  <Link href="/services">Our Services</Link>
+                </Button>
+              </div>
+
+              {/* Bottom-left tagline */}
+              <div className="mt-auto border-t border-white/10 pt-6">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">
+                  Sania Crafts
+                </p>
+                <p className="text-sm font-bold uppercase tracking-widest text-white/50">
+                  Define Your Quality.
+                </p>
+              </div>
+            </div>
+
+            {/* ── Center column: main hero image ── */}
+            <div className="relative flex items-end justify-center order-1 md:order-2">
+              {/* Soft radial glow behind the image */}
+              <div
+                aria-hidden="true"
+                className="absolute bottom-0 left-1/2 h-[70%] w-[70%] -translate-x-1/2 rounded-full bg-primary/10 blur-[80px]"
+              />
+              <Image
+                src="/images/jkt2.webp"
+                alt="Featured garment"
+                width={500}
+                height={700}
+                priority
+                className="relative z-10 max-h-[80vh] w-auto object-cover object-top drop-shadow-2xl"
+              />
+              {/* "New" pill on the image */}
+              <span className="absolute left-[58%] top-[38%] z-20 rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-900 shadow-lg">
+                New
+              </span>
+            </div>
+
+            {/* ── Right column: floating card + collection stamp ── */}
+            <div className="hidden flex-col items-end justify-between py-20 md:flex order-3">
+              {/* Floating product card */}
+              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-2xl backdrop-blur-md">
+                <Image
+                  src="/images/jkt2.webp"
+                  alt="Product preview"
+                  width={56}
+                  height={72}
+                  className="h-[72px] w-[56px] rounded-xl object-cover"
+                />
+                <div className="flex flex-col gap-1.5 pr-1">
+                  <span className="w-fit rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">
+                    New
+                  </span>
+                  <p className="text-xs leading-tight text-white/50">
+                    Latest<br />Collection
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom-right collection stamp */}
+              <div className="text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">
+                  Collection
+                </p>
+                <p className="text-6xl font-black leading-none text-white/20">2026</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -198,7 +260,7 @@ export default function HomePage() {
                 asChild
                 size="lg"
                 variant="outline"
-                className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+                className="border-primary-foreground/30 text-primary/60 hover:bg-primary-foreground/10"
               >
                 <Link href="/services">View Services</Link>
               </Button>
