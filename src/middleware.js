@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server';
 
-// Auth enforcement is bypassed for UI review — no backend connected yet.
-// To re-enable, restore the cookie-check logic below and wrap admin routes
-// in <AuthGuard> again (src/app/(admin)/layout.jsx).
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'token';
 
-export function middleware() {
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
+
+export function middleware(request) {
+  const { pathname } = request.nextUrl;
+
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  if (isPublic) return NextResponse.next();
+
+  const hasSession = request.cookies.has(COOKIE_NAME);
+  if (!hasSession) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
+  }
+
   return NextResponse.next();
 }
 
