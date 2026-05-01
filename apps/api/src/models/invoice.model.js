@@ -1,42 +1,32 @@
 const mongoose = require("mongoose");
 
-const itemSchema = new mongoose.Schema(
-  {
-    description: { type: String, required: true },
-    quantity: { type: Number, required: true },
-    unitPrice: { type: Number, required: true },
-    amount: { type: Number, required: true },
+const invoiceSchema = new mongoose.Schema({
+  invoiceNumber: { type: String, required: true, unique: true },
+  poNumber: { type: String ,required:true  },
+  date: { type: Date, default: Date.now },
+  fromBusiness: { type: mongoose.Schema.Types.ObjectId, ref: "Business" },
+  toClient: { type: mongoose.Schema.Types.ObjectId, ref: "Client" },
+  category: {
+    type: String,
+    enum: ["Finished Garments", "CMT Services", "Other Income"],
+   
   },
-  { _id: false }
-);
-
-const invoiceSchema = new mongoose.Schema(
-  {
-    invoiceNumber: { type: String, unique: true },
-    poNumber: { type: String, default: "" },
-    date: { type: Date, default: Date.now },
-    fromBusiness: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Business",
-      required: true,
-    },
-    toClient: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Client",
-      required: true,
-    },
-    items: { type: [itemSchema], required: true },
-    subTotal: { type: Number, required: true },
-    tax: { type: Number, default: 0 },
-    totalAmount: { type: Number, required: true },
-    category: { type: String, required: true },
-    status: {
-      type: String,
-      enum: ["Pending", "Sent", "Paid"],
-      default: "Pending",
-    },
+  items: [
+    {
+      quantity: Number,
+      description: String,
+      unitPrice: Number,
+      amount: Number
+    }
+  ],
+  subTotal: { type: Number, required: true },
+  tax: { type: Number },
+  totalAmount: { type: Number, required: true },
+  status: { 
+    type: String, 
+    enum: ["Pending", "Sent", "Paid"], 
+    default: "Pending" 
   },
-  { timestamps: true }
-);
+});
 
 module.exports = mongoose.model("Invoice", invoiceSchema);

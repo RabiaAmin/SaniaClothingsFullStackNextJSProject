@@ -18,7 +18,7 @@ router.delete("/delete/:id", protect, deleteInvoice);
 router.get("/get/:id", protect, getInvoice);
 router.get("/getAllOfThisMonth", protect, getAllInvoices);
 router.get("/weekly-statements", protect, getWeeklyStatements);
-router.get("/getOrdersPerProduct", protect, getOrdersPerProduct);
+
 router.put("/mark-as-paid", protect, markAsPaid);
 
 module.exports = router;

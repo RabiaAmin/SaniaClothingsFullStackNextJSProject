@@ -4,29 +4,59 @@ const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true },
-    email: { type: String, required: true, unique: true, lowercase: true },
-    phone: { type: String, required: true },
-    password: { type: String, required: true, minlength: 6, select: false },
-    aboutMe: { type: String, default: "" },
-    avatar: {
-      public_id: { type: String, default: "" },
-      url: { type: String, default: "" },
+    username:{
+        type:String,
+        required: true,
+        trim:true,
+        lowercase:true,
+        unique:true,
+        minlength:[3,'User must be at least 3 characters long']
     },
-    resetPasswordToken: String,
-    resetPasswordExpire: Date,
-  },
-  { timestamps: true }
+    email: {
+        type:String,
+        required: true,
+        trim:true,
+        lowercase:true,
+        unique:true,
+        minlength:[13,'Email must be at least 13 characters long']
+    },
+    phone:{
+        type: String,
+        required: true
+    },
+    password: {
+        type:String,
+        required: true,
+        trim:true,
+        minlength:[5,'Password must be at least 5 characters long'],
+        select: false
+    },
+    aboutMe: {
+        type:String,
+        required:[true,"About Me Field  Required!"]
+    },
+    avatar: {
+        public_id: {
+            type:String,
+            required:true,
+        },
+        url: {
+            type: String,
+            required: true
+        }
+    },
+    resetPasswordToken:String,
+    resetPasswordExpire: Date, }
 );
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
 userSchema.methods.getResetPasswordToken = function () {
@@ -39,4 +69,5 @@ userSchema.methods.getResetPasswordToken = function () {
   return resetToken;
 };
 
-module.exports = mongoose.model("User", userSchema);
+const User = mongoose.model("user", userSchema );
+module.exports = User;

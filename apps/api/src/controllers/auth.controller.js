@@ -74,7 +74,15 @@ exports.login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email }).select("+password");
 
-  if (!user || !(await user.comparePassword(password))) {
+  // TODO: remove after diagnosing login failure — do NOT leave in production
+  if (!user) {
+    console.log("[LOGIN DEBUG] No user found for email:", email);
+    return res.status(401).json({ success: false, message: "Invalid Email Or Password!" });
+  }
+  console.log("[LOGIN DEBUG] User found. Stored hash prefix:", user.password?.slice(0, 7));
+  const passwordMatch = await user.comparePassword(password);
+  console.log("[LOGIN DEBUG] Password match:", passwordMatch);
+  if (!passwordMatch) {
     return res.status(401).json({ success: false, message: "Invalid Email Or Password!" });
   }
 
