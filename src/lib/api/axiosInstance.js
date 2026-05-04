@@ -34,10 +34,13 @@ axiosInstance.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
 
-    if (status === 401) {
-      // Session expired — redirect to login.
-      // Only runs in browser context.
-      if (typeof window !== 'undefined') {
+    if (status === 401 && typeof window !== 'undefined') {
+      // Session expired — redirect to login, but only when we're not already
+      // on a public/auth page. Without this guard, getMe() firing on /login
+      // returns 401 → redirect → /login → getMe() → 401 → ∞ loop.
+      const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
+      const onAuthPage = AUTH_PATHS.some((p) => window.location.pathname.startsWith(p));
+      if (!onAuthPage) {
         window.location.href = '/login';
       }
     }

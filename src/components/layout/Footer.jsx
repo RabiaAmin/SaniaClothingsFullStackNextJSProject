@@ -1,7 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import { Scissors } from 'lucide-react';
+import { useBusiness } from '@/hooks/useBusiness';
 
 export default function Footer() {
+  const { business } = useBusiness();
+
   return (
     <footer className="border-t bg-muted/40">
       <div className="container mx-auto px-4 py-10">
@@ -10,7 +15,7 @@ export default function Footer() {
           <div className="flex flex-col gap-3">
             <Link href="/" className="flex items-center gap-2 font-bold text-foreground">
               <Scissors className="h-4 w-4 text-primary" />
-              Sania Clothing
+              {business?.name ?? 'Sania Clothing'}
             </Link>
             <p className="text-sm text-muted-foreground">
               Garment manufacturing & CMT services. Quality craftsmanship, on-time delivery.
@@ -38,15 +43,23 @@ export default function Footer() {
           <div>
             <p className="mb-3 text-sm font-semibold">Contact</p>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <span>info@saniaclothing.com</span>
-              <span>+92 300 000 0000</span>
-              <span>Lahore, Punjab, Pakistan</span>
+              {business?.email && (
+                <a href={`mailto:${business.email}`} className="hover:text-foreground transition-colors">
+                  {business.email}
+                </a>
+              )}
+              {business?.phone && (
+                <a href={`tel:${business.phone}`} className="hover:text-foreground transition-colors">
+                  {business.phone}
+                </a>
+              )}
+              {business?.address && <span>{business.address}</span>}
             </div>
           </div>
         </div>
 
         <div className="mt-8 border-t pt-6 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Sania Clothing. All rights reserved.
+          © {new Date().getFullYear()} {business?.name ?? 'Sania Clothing'}. All rights reserved.
         </div>
       </div>
     </footer>

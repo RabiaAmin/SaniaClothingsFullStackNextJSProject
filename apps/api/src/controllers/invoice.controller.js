@@ -119,13 +119,16 @@ exports.getAllInvoices = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const now = new Date();
-  const defaultStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const defaultEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  
 
   const startDate = req.query.startDate ? new Date(req.query.startDate) : defaultStart;
   const endDate = req.query.endDate
     ? new Date(new Date(req.query.endDate).setHours(23, 59, 59, 999))
     : defaultEnd;
+
 
   const filter = { date: { $gte: startDate, $lte: endDate } };
 

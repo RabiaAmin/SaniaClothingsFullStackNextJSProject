@@ -1,19 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Phone, Mail, MapPin, Send, CheckCircle2 } from 'lucide-react';
+import { Phone, Mail, MapPin, Send, CheckCircle2, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useBusiness } from '@/hooks/useBusiness';
 
-const contactInfo = [
-  { icon: Phone, label: 'Phone', value: '+92 300 000 0000' },
-  { icon: Mail, label: 'Email', value: 'info@saniaclothing.com' },
-  { icon: MapPin, label: 'Address', value: 'Lahore, Punjab, Pakistan' },
-];
+function whatsappUrl(phone) {
+  const digits = phone.replace(/\D/g, '').replace(/^0/, '92');
+  return `https://wa.me/${digits}`;
+}
 
 export default function ContactPage() {
+  const { business, isLoading } = useBusiness();
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,27 @@ export default function ContactPage() {
     setLoading(false);
     setSubmitted(true);
   }
+
+  const contactItems = [
+    {
+      icon: Phone,
+      label: 'Phone',
+      value: isLoading ? '…' : (business?.phone ?? '—'),
+      href: business?.phone ? `tel:${business.phone}` : null,
+    },
+    {
+      icon: Mail,
+      label: 'Email',
+      value: isLoading ? '…' : (business?.email ?? '—'),
+      href: business?.email ? `mailto:${business.email}` : null,
+    },
+    {
+      icon: MapPin,
+      label: 'Address',
+      value: isLoading ? '…' : (business?.address ?? '—'),
+      href: null,
+    },
+  ];
 
   return (
     <div className="flex flex-col">
@@ -139,7 +161,7 @@ export default function ContactPage() {
             <div>
               <h2 className="mb-6 text-2xl font-bold">Business Information</h2>
               <div className="flex flex-col gap-4">
-                {contactInfo.map(({ icon: Icon, label, value }) => (
+                {contactItems.map(({ icon: Icon, label, value, href }) => (
                   <div
                     key={label}
                     className="flex items-start gap-4 rounded-xl border bg-card p-4 shadow-sm"
@@ -151,20 +173,51 @@ export default function ContactPage() {
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         {label}
                       </p>
-                      <p className="mt-0.5 text-sm font-medium">{value}</p>
+                      {href ? (
+                        <a
+                          href={href}
+                          className="mt-0.5 text-sm font-medium hover:text-primary transition-colors"
+                        >
+                          {value}
+                        </a>
+                      ) : (
+                        <p className="mt-0.5 text-sm font-medium">{value}</p>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* WhatsApp CTA */}
+              {business?.phone && (
+                <a
+                  href={whatsappUrl(business.phone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm font-medium text-green-600 transition-colors hover:bg-green-500/20 dark:text-green-400"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Chat on WhatsApp
+                </a>
+              )}
             </div>
 
-            {/* Map placeholder */}
+            {/* Map */}
             <div className="overflow-hidden rounded-xl border bg-muted shadow-sm">
-              <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
-                <MapPin className="h-8 w-8" />
-                <p className="text-sm font-medium">Lahore, Pakistan</p>
-                <p className="text-xs">Map integration coming soon</p>
-              </div>
+              {business?.address ? (
+                <iframe
+                  title="Business location"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(business.address)}&output=embed&z=15`}
+                  className="h-48 w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              ) : (
+                <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <MapPin className="h-8 w-8" />
+                  <p className="text-sm font-medium">{isLoading ? '…' : 'No address set'}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

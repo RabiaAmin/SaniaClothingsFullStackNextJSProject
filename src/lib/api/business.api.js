@@ -16,6 +16,7 @@ const BUSINESS = '/business';
  * @property {string}  [fax]
  */
 
+
 const businessApi = {
   /**
    * GET /api/v1/business/get — auth required
