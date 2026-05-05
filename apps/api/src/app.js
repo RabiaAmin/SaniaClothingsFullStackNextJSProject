@@ -9,6 +9,7 @@ const businessRoutes = require("./routes/business.routes");
 const clientRoutes = require("./routes/client.routes");
 const invoiceRoutes = require("./routes/invoice.routes");
 const bankAccountRoutes = require("./routes/bankAccount.routes");
+const productRoutes = require("./routes/product.routes");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -34,6 +35,7 @@ app.use("/api/v1/business/invoice", invoiceRoutes);
 app.use("/api/v1/business", businessRoutes);
 app.use("/api/v1/client", clientRoutes);
 app.use("/api/v1/bankAccount", bankAccountRoutes);
+app.use("/api/v1/product", productRoutes);
 
 app.use(errorHandler);
 
