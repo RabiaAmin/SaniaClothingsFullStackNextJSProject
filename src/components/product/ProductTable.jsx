@@ -44,10 +44,10 @@ export default function ProductTable({ products, onEdit, onDelete, onToggleActiv
         {products.map((p) => (
           <TableRow key={p._id}>
             <TableCell>
-              {p.images?.[0] ? (
+              {p.images?.[0]?.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={p.images[0]}
+                  src={p.images[0].url}
                   alt={p.name}
                   className="h-10 w-10 rounded-md object-cover border"
                   onError={(e) => {

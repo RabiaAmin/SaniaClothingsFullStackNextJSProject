@@ -1,83 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Upload, X, Package } from 'lucide-react';
 
 const EMPTY_FORM = () => ({
   name: '',
   description: '',
   category: '',
-  images: [''],
   stock: 0,
   isActive: true,
 });
 
-/**
- * @param {{
- *   initialData?: object,
- *   onSubmit: (data: object) => Promise<void>,
- *   submitLabel?: string,
- * }} props
- */
 export default function ProductForm({ initialData, onSubmit, submitLabel = 'Save Product' }) {
   const router = useRouter();
+  const fileInputRef = useRef(null);
+
   const [form, setForm] = useState(() =>
     initialData
       ? {
           name: initialData.name ?? '',
           description: initialData.description ?? '',
           category: initialData.category ?? '',
-          images: initialData.images?.length ? initialData.images : [''],
           stock: initialData.stock ?? 0,
           isActive: initialData.isActive ?? true,
         }
       : EMPTY_FORM()
   );
+
+  const [existingImages, setExistingImages] = useState(
+    () => initialData?.images?.filter((img) => img?.url) ?? []
+  );
+  const [newFiles, setNewFiles] = useState([]);
   const [saving, setSaving] = useState(false);
 
   function set(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
   }
 
-  function setImage(index, value) {
-    setForm((p) => {
-      const images = [...p.images];
-      images[index] = value;
-      return { ...p, images };
-    });
+  function handleFileChange(e) {
+    const files = Array.from(e.target.files);
+    setNewFiles((prev) => [...prev, ...files]);
+    e.target.value = '';
   }
 
-  function addImage() {
-    setForm((p) => ({ ...p, images: [...p.images, ''] }));
+  function removeNewFile(index) {
+    setNewFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function removeImage(index) {
-    setForm((p) => ({
-      ...p,
-      images: p.images.filter((_, i) => i !== index),
-    }));
+  function removeExistingImage(index) {
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        images: form.images.map((u) => u.trim()).filter(Boolean),
-        stock: Number(form.stock),
-      };
-      await onSubmit(payload);
+      const formData = new FormData();
+      formData.append('name', form.name);
+      formData.append('description', form.description);
+      formData.append('category', form.category);
+      formData.append('stock', String(Number(form.stock)));
+      formData.append('isActive', String(form.isActive));
+      formData.append('existingImages', JSON.stringify(existingImages));
+      newFiles.forEach((file) => formData.append('images', file));
+      await onSubmit(formData);
     } finally {
       setSaving(false);
     }
   }
+
+  const totalImages = existingImages.length + newFiles.length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -143,50 +141,90 @@ export default function ProductForm({ initialData, onSubmit, submitLabel = 'Save
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Product Images</p>
-              <p className="text-xs text-muted-foreground">Enter image URLs</p>
+              <p className="text-xs text-muted-foreground">
+                {totalImages} image{totalImages !== 1 ? 's' : ''}
+              </p>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={addImage}>
-              <Plus className="h-4 w-4" /> Add URL
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" />
+              Upload Images
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
 
-          {form.images.map((url, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <div className="flex-1 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    value={url}
-                    onChange={(e) => setImage(i, e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeImage(i)}
-                    disabled={form.images.length === 1}
-                    className="shrink-0 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                {url && (
-                  <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-2">
-                    <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          {existingImages.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Current Images
+              </p>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                {existingImages.map((img, i) => (
+                  <div key={img.public_id ?? i} className="group relative aspect-square">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={url}
-                      alt="preview"
-                      className="h-16 w-16 rounded object-cover border"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
+                      src={img.url}
+                      alt=""
+                      className="h-full w-full rounded-md border object-cover"
                     />
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(i)}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </div>
-                )}
+                ))}
               </div>
             </div>
-          ))}
+          )}
+
+          {newFiles.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                New Images
+              </p>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                {newFiles.map((file, i) => (
+                  <div key={i} className="group relative aspect-square">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt=""
+                      className="h-full w-full rounded-md border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeNewFile(i)}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {totalImages === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 text-center">
+              <Package className="mb-2 h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">No images added yet</p>
+              <p className="text-xs text-muted-foreground">Click "Upload Images" to add photos</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
