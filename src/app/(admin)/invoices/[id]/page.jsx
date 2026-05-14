@@ -5,26 +5,57 @@ import Link from 'next/link';
 import { useInvoice, useDeleteInvoice } from '@/hooks/useInvoices';
 import { toast } from '@/hooks/useToast';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { createPdfFilename, exportElementToPdf, printElement } from '@/lib/utils/pdfExport';
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Pencil, Trash2, Printer, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Pencil, Trash2, Printer, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 
 const PRINT_STYLES = `
   @media print {
-    body * { visibility: hidden !important; }
-    #invoice-print, #invoice-print * { visibility: visible !important; }
+    @page { margin: 12mm; }
+
+    html,
+    body {
+      height: auto !important;
+      overflow: visible !important;
+      background: white !important;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    body > div,
+    main,
+    main > div {
+      display: block !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+
     #invoice-print {
-      position: fixed !important;
-      inset: 0 !important;
+      visibility: visible !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
       width: 100% !important;
       max-width: none !important;
       margin: 0 !important;
-      padding: 32px !important;
+      padding: 0 !important;
       background: white !important;
       border: none !important;
+      box-shadow: none !important;
+    }
+
+    #invoice-print * {
+      visibility: visible !important;
+    }
+
+    .print\\:hidden {
+      display: none !important;
     }
   }
 `;
@@ -35,6 +66,8 @@ export default function ViewInvoicePage() {
   const { id } = useParams();
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const printRef = useRef(null);
 
   const { data, isLoading, error } = useInvoice(id);
   const deleteMutation = useDeleteInvoice();
@@ -56,6 +89,29 @@ export default function ViewInvoicePage() {
       setShowDelete(false);
     }
   }
+
+  const handlePrint = useCallback(async () => {
+    await printElement(printRef.current);
+  }, []);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!printRef.current || !invoice) return;
+
+    setIsGeneratingPdf(true);
+    try {
+      await exportElementToPdf(
+        printRef.current,
+        createPdfFilename('invoice', invoice.invoiceNumber ?? id)
+      );
+    } catch (err) {
+      toast({
+        title: err?.message ?? 'PDF download failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [id, invoice]);
 
   if (isLoading) {
     return (
@@ -92,8 +148,22 @@ export default function ViewInvoicePage() {
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
+        <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
           <Printer className="h-4 w-4" /> Print
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadPdf}
+          disabled={isGeneratingPdf}
+        >
+          {isGeneratingPdf ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Download PDF
         </Button>
         <Button asChild size="sm" variant="outline">
           <Link href={`/invoices/${id}/edit`}>
@@ -108,6 +178,7 @@ export default function ViewInvoicePage() {
       {/* ── Invoice Document ─────────────────────────────────────────────── */}
       <div
         id="invoice-print"
+        ref={printRef}
         className="mx-auto max-w-4xl border border-gray-300 bg-white p-10 font-sans text-[13px] text-gray-900 shadow-sm"
       >
         {/* Header row */}
@@ -150,9 +221,7 @@ export default function ViewInvoicePage() {
             {client.vatNumber && <p>VAT No: {client.vatNumber}</p>}
             {client.registrationNumber && <p>Reg No: {client.registrationNumber}</p>}
             {client.address && <p>{client.address}</p>}
-            {(client.telphone || client.phone) && (
-              <p>tel: {client.telphone ?? client.phone}</p>
-            )}
+            {(client.telphone || client.phone) && <p>tel: {client.telphone ?? client.phone}</p>}
             {client.phone && client.telphone && <p>phone: {client.phone}</p>}
             {client.fax && <p>Fax: {client.fax}</p>}
           </div>
@@ -177,9 +246,7 @@ export default function ViewInvoicePage() {
           <tbody>
             {items.map((item, i) => (
               <tr key={i} className="border-b border-gray-200">
-                <td className="border-r border-gray-300 px-3 py-2 text-center">
-                  {item.quantity}
-                </td>
+                <td className="border-r border-gray-300 px-3 py-2 text-center">{item.quantity}</td>
                 <td className="border-r border-gray-300 px-3 py-2">{item.description}</td>
                 <td className="border-r border-gray-300 px-3 py-2 text-right tabular-nums">
                   {formatCurrency(item.unitPrice ?? 0)}
@@ -217,8 +284,7 @@ export default function ViewInvoicePage() {
                   {bankAccount.accountHolderName}
                 </p>
                 <p>
-                  <span className="font-semibold">Account Number:</span>{' '}
-                  {bankAccount.accountNumber}
+                  <span className="font-semibold">Account Number:</span> {bankAccount.accountNumber}
                 </p>
                 {bankAccount.branchCode && (
                   <p>

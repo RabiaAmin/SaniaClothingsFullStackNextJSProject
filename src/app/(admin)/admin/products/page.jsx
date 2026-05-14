@@ -69,7 +69,7 @@ export default function ProductsPage() {
         title="Product Manager"
         description="Manage your product catalogue"
         action={
-          <Button onClick={() => router.push('/products/create')}>
+          <Button onClick={() => router.push('/admin/products/create')}>
             <Plus className="h-4 w-4" /> Add Product
           </Button>
         }
@@ -103,7 +103,7 @@ export default function ProductsPage() {
               title="No products yet"
               description="Add your first product to start your catalogue."
               action={
-                <Button onClick={() => router.push('/products/create')}>
+                <Button onClick={() => router.push('/admin/products/create')}>
                   <Plus className="h-4 w-4" /> Add Product
                 </Button>
               }
@@ -112,7 +112,7 @@ export default function ProductsPage() {
           ) : (
             <ProductTable
               products={displayed}
-              onEdit={(p) => router.push(`/products/${p._id}/edit`)}
+              onEdit={(p) => router.push(`/admin/products/${p._id}/edit`)}
               onDelete={(id) => setDeleteTarget(id)}
               onToggleActive={handleToggleActive}
             />

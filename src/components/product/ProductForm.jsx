@@ -222,14 +222,16 @@ export default function ProductForm({ initialData, onSubmit, submitLabel = 'Save
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 text-center">
               <Package className="mb-2 h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">No images added yet</p>
-              <p className="text-xs text-muted-foreground">Click "Upload Images" to add photos</p>
+              <p className="text-xs text-muted-foreground">
+                Click &quot;Upload Images&quot; to add photos
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => router.push('/products')}>
+        <Button type="button" variant="outline" onClick={() => router.push('/admin/products')}>
           Cancel
         </Button>
         <Button type="submit" disabled={saving}>

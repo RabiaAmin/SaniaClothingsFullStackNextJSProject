@@ -24,7 +24,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/invoices', label: 'Invoice Manager', icon: FileText },
   { href: '/clients', label: 'Client Manager', icon: Users },
-  { href: '/products', label: 'Products', icon: Package },
+  { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/business', label: 'Business Profile', icon: Building2 },
   { href: '/bank-accounts', label: 'Bank Accounts', icon: CreditCard },
   { href: '/password', label: 'Password Manager', icon: KeyRound },

@@ -15,7 +15,7 @@ export default function CreateProductPage() {
     try {
       await createMutation.mutateAsync(payload);
       toast({ title: 'Product created' });
-      router.push('/products');
+      router.push('/admin/products');
     } catch (err) {
       toast({
         title: err?.response?.data?.message ?? err.message ?? 'Create failed',

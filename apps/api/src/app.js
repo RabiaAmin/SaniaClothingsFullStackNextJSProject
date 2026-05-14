@@ -1,4 +1,6 @@
+require("./config/env");
 const express = require("express");
+
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const cloudinary = require("cloudinary").v2;

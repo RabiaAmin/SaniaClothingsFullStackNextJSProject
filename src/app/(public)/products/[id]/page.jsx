@@ -40,11 +40,11 @@ export default function ProductDetailPage() {
       <div className="container mx-auto max-w-5xl px-4 py-24 text-center">
         <p className="text-sm text-destructive">Product not found.</p>
         <Link
-          href="/catalogue"
+          href="/products"
           className="mt-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Back to Catalogue
+          Back to Products
         </Link>
       </div>
     );
@@ -54,11 +54,11 @@ export default function ProductDetailPage() {
     <div className="min-h-screen">
       <div className="container mx-auto max-w-5xl px-4 py-8">
         <Link
-          href="/catalogue"
+          href="/products"
           className="mb-8 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Back to Catalogue
+          Back to Products
         </Link>
 
         <div className="grid gap-10 md:grid-cols-2">

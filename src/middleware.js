@@ -2,13 +2,24 @@ import { NextResponse } from 'next/server';
 
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'token';
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
+const PROTECTED_PATHS = [
+  '/admin',
+  '/dashboard',
+  '/invoices',
+  '/clients',
+  '/business',
+  '/bank-accounts',
+  '/password',
+];
+
+function isProtectedPath(pathname) {
+  return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-  if (isPublic) return NextResponse.next();
+  if (!isProtectedPath(pathname)) return NextResponse.next();
 
   const hasSession = request.cookies.has(COOKIE_NAME);
   if (!hasSession) {

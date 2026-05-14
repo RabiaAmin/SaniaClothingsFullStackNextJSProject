@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:api": "npm --prefix apps/api run dev",
     "build": "next build",
     "start": "next start",
+    "start:api": "npm --prefix apps/api start",
     "lint": "next lint",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -25,6 +27,8 @@
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.469.0",
     "next": "^15.3.0",
     "react": "^19.0.0",

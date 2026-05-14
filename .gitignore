@@ -11,10 +11,16 @@ out/
 build/
 dist/
 
-# Environment files — never commit secrets
+# Environment files - never commit secrets
 .env
 .env.local
+.env.production
 .env.*.local
+apps/api/.env
+apps/api/.env.development
+apps/api/.env.production
+apps/api/.env.*.local
+apps/api/.evn.production
 
 # Logs
 npm-debug.log*
@@ -31,7 +37,6 @@ Thumbs.db
 *.swp
 *.swo
 
-#claude
+# Claude local docs
 .claude/
 CLAUDE.md
-

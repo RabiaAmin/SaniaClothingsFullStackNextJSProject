@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useWeeklyStatements, useMarkAsPaid } from '@/hooks/useInvoices';
@@ -9,36 +9,75 @@ import { useFetch } from '@/hooks/useFetch';
 import businessApi from '@/lib/api/business.api';
 import { toast } from '@/hooks/useToast';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { createPdfFilename, exportElementToPdf, printElement } from '@/lib/utils/pdfExport';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Printer, CheckCheck, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Printer, CheckCheck, Loader2, AlertCircle, Download } from 'lucide-react';
 
 const PRINT_STYLES = `
   @media print {
-    body * { visibility: hidden !important; }
-    #statement-print, #statement-print * { visibility: visible !important; }
+    @page { margin: 12mm; }
+
+    html,
+    body {
+      height: auto !important;
+      overflow: visible !important;
+      background: white !important;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    body > div,
+    main,
+    main > div {
+      display: block !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+
     #statement-print {
-      position: fixed !important;
-      inset: 0 !important;
+      visibility: visible !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
       width: 100% !important;
       max-width: none !important;
       margin: 0 !important;
-      padding: 32px !important;
+      padding: 0 !important;
       background: white !important;
       border: none !important;
+      box-shadow: none !important;
+    }
+
+    #statement-print * {
+      visibility: visible !important;
+    }
+
+    .print\\:hidden {
+      display: none !important;
     }
   }
 `;
 
 function StatementView() {
   const searchParams = useSearchParams();
+  const printRef = useRef(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const clientName = searchParams.get('client') ?? '';
   const startDate = searchParams.get('startDate') ?? '';
   const endDate = searchParams.get('endDate') ?? '';
 
-  const { data: statementsData, isLoading: stLoading, error: stError } = useWeeklyStatements(
-    startDate && endDate ? { startDate, endDate } : { startDate: '1970-01-01', endDate: '1970-01-01' }
+  const {
+    data: statementsData,
+    isLoading: stLoading,
+    error: stError,
+  } = useWeeklyStatements(
+    startDate && endDate
+      ? { startDate, endDate }
+      : { startDate: '1970-01-01', endDate: '1970-01-01' }
   );
   const { data: bizRaw, isLoading: bizLoading } = useFetch(() => businessApi.getBusiness());
   const { data: clientsData } = useClients();
@@ -65,6 +104,26 @@ function StatementView() {
       });
     }
   }
+
+  const handlePrint = useCallback(async () => {
+    await printElement(printRef.current);
+  }, []);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!printRef.current || !clientName) return;
+
+    setIsGeneratingPdf(true);
+    try {
+      await exportElementToPdf(printRef.current, createPdfFilename('statement', clientName));
+    } catch (err) {
+      toast({
+        title: err?.message ?? 'PDF download failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [clientName]);
 
   if (stLoading || bizLoading) {
     return (
@@ -98,8 +157,22 @@ function StatementView() {
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
+        <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
           <Printer className="h-4 w-4" /> Print
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadPdf}
+          disabled={isGeneratingPdf}
+        >
+          {isGeneratingPdf ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Download PDF
         </Button>
         <Button
           size="sm"
@@ -118,6 +191,7 @@ function StatementView() {
       {/* ── Statement Document ───────────────────────────────────────────── */}
       <div
         id="statement-print"
+        ref={printRef}
         className="mx-auto max-w-4xl border border-gray-300 bg-white p-10 font-sans text-[13px] text-gray-900 shadow-sm"
       >
         {/* Title */}
@@ -152,8 +226,7 @@ function StatementView() {
 
         {/* Date row */}
         <div className="mb-4 border border-gray-300 px-4 py-2.5 text-[13px]">
-          <span className="font-bold">Date:</span>{' '}
-          {endDate ? formatDate(endDate) : '—'}
+          <span className="font-bold">Date:</span> {endDate ? formatDate(endDate) : '—'}
         </div>
 
         {/* Invoices table */}
@@ -166,9 +239,7 @@ function StatementView() {
               <th className="border border-gray-300 px-4 py-2.5 text-center font-semibold">
                 PO Number
               </th>
-              <th className="border border-gray-300 px-4 py-2.5 text-center font-semibold">
-                Code
-              </th>
+              <th className="border border-gray-300 px-4 py-2.5 text-center font-semibold">Code</th>
               <th className="border border-gray-300 px-4 py-2.5 text-center font-semibold">
                 Amount
               </th>
@@ -194,10 +265,7 @@ function StatementView() {
 
             {/* Total row */}
             <tr className="bg-gray-50 font-bold">
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-4 py-3 text-right"
-              >
+              <td colSpan={3} className="border border-gray-300 px-4 py-3 text-right">
                 Total Amount
               </td>
               <td className="border border-gray-300 px-4 py-3 text-center tabular-nums">

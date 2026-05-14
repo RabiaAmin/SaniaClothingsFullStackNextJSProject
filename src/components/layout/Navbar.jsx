@@ -40,7 +40,7 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
     const navLinks = [
       { href: '/about', label: 'About' },
       { href: '/services', label: 'Services' },
-      { href: '/catalogue', label: 'Catalogue' },
+      { href: '/products', label: 'Products' },
       { href: '/contact', label: 'Contact' },
     ];
 

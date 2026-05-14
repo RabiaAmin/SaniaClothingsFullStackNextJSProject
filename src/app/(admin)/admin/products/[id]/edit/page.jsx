@@ -20,7 +20,7 @@ export default function EditProductPage() {
     try {
       await updateMutation.mutateAsync({ id, payload });
       toast({ title: 'Product updated' });
-      router.push('/products');
+      router.push('/admin/products');
     } catch (err) {
       toast({
         title: err?.response?.data?.message ?? err.message ?? 'Update failed',

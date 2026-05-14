@@ -4,8 +4,10 @@
   "description": "Invoice Management System API",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "start": "node -e \"process.env.NODE_ENV = process.env.NODE_ENV || 'production'; require('./src/server');\"",
+    "start:dev": "node -e \"process.env.NODE_ENV = 'development'; require('./src/server');\"",
+    "start:prod": "node -e \"process.env.NODE_ENV = 'production'; require('./src/server');\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

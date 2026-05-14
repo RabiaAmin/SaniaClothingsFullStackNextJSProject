@@ -1,66 +1,65 @@
 'use client';
 
 import { createContext, useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import authApi from '@/lib/api/auth.api';
 
-/**
- * @typedef {Object} AuthContextValue
- * @property {import('@/types').User|null} user
- * @property {boolean} isAuthenticated
- * @property {boolean} isLoading          – true only during the initial getMe() call
- * @property {(credentials: { email: string, password: string }) => Promise<void>} login
- * @property {(payload: { firstName: string, lastName: string, email: string, password: string }) => Promise<void>} register
- * @property {() => Promise<void>} logout
- * @property {(user: import('@/types').User) => void} setUser
- */
-
-/** @type {React.Context<AuthContextValue>} */
 export const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+const PROTECTED_PATHS = [
+  '/admin',
+  '/dashboard',
+  '/invoices',
+  '/clients',
+  '/business',
+  '/bank-accounts',
+  '/password',
+];
 
-  // ── Hydrate on mount ─────────────────────────────────────────────────────
+function isProtectedPath(pathname) {
+  return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+export function AuthProvider({ children }) {
+  const pathname = usePathname();
+  const isProtected = isProtectedPath(pathname);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(isProtected);
+  const [checkedPath, setCheckedPath] = useState(isProtected ? null : pathname);
+
   useEffect(() => {
+    if (!isProtected) {
+      setIsLoading(false);
+      setCheckedPath(pathname);
+      return;
+    }
+
+    setIsLoading(true);
+    setCheckedPath(null);
     authApi
       .getMe()
       .then((res) => {
-        // Normalize: backends may return { user: {...} } or the user object directly
         setUser(res.data?.user ?? res.data);
       })
       .catch(() => setUser(null))
-      .finally(() => setIsLoading(false));
-  }, []);
+      .finally(() => {
+        setCheckedPath(pathname);
+        setIsLoading(false);
+      });
+  }, [isProtected, pathname]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────
-
-  /**
-   * Login and hydrate user from the response.
-   * Throws on failure so the calling component can display the error.
-   */
   const login = useCallback(async (credentials) => {
     const res = await authApi.login(credentials);
     setUser(res.data?.user ?? res.data);
   }, []);
 
-  /**
-   * Register a new account and auto-login by hydrating user state.
-   * Throws on failure so the calling component can display the error.
-   */
   const register = useCallback(async (payload) => {
     const res = await authApi.register(payload);
     setUser(res.data?.user ?? res.data);
   }, []);
 
-  /**
-   * Logout — calls the server to invalidate the HttpOnly cookie,
-   * then clears local state.
-   */
   const logout = useCallback(async () => {
-    await authApi.logout().catch(() => {
-      // Server may already have cleared the cookie; clear local state anyway
-    });
+    await authApi.logout().catch(() => {});
     setUser(null);
   }, []);
 
@@ -69,7 +68,7 @@ export function AuthProvider({ children }) {
       value={{
         user,
         isAuthenticated: !!user,
-        isLoading,
+        isLoading: isProtected && (isLoading || checkedPath !== pathname),
         login,
         register,
         logout,
