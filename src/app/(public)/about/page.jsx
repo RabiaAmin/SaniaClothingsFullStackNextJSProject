@@ -28,7 +28,7 @@ const values = [
 ];
 
 const timeline = [
-  { year: '2010', event: 'Founded in Lahore, Pakistan' },
+  { year: '2010', event: 'Founded in Durban, South Africa' },
   { year: '2014', event: 'Expanded cutting facility with modern machinery' },
   { year: '2018', event: 'Launched full CMT service division' },
   { year: '2022', event: 'Reached 500+ completed projects' },
