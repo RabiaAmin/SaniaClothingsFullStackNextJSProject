@@ -20,10 +20,23 @@ cloudinary.config({
 });
 
 const app = express();
+app.set("trust proxy", 1);
+
+const allowedOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -32,12 +45,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use('/api/v1/user', authRoutes);
-app.use('/api/v1/business/invoice', invoiceRoutes);
-app.use('/api/v1/business', businessRoutes);
-app.use('/api/v1/client', clientRoutes);
-app.use('/api/v1/bankAccount', bankAccountRoutes);
-app.use('/api/v1/product', productRoutes);
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ success: true, status: "ok" });
+});
+
+app.use("/api/v1/user", authRoutes);
+app.use("/api/v1/business/invoice", invoiceRoutes);
+app.use("/api/v1/business", businessRoutes);
+app.use("/api/v1/client", clientRoutes);
+app.use("/api/v1/bankAccount", bankAccountRoutes);
+app.use("/api/v1/product", productRoutes);
 
 app.use(errorHandler);
 
