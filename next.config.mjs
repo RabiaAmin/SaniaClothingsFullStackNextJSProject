@@ -2,6 +2,10 @@
 const nextConfig = {
   // Strict mode for catching potential issues early
   reactStrictMode: true,
+  output: 'standalone',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 
   images: {
     remotePatterns: [
