@@ -24,7 +24,16 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Eye, Pencil, Trash2, MoreHorizontal, FileText, Plus, Loader2, ChevronDown } from 'lucide-react';
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  MoreHorizontal,
+  FileText,
+  Plus,
+  Loader2,
+  ChevronDown,
+} from 'lucide-react';
 
 const STATUSES = ['Pending', 'Sent', 'Paid'];
 

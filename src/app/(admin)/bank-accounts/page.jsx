@@ -86,7 +86,10 @@ function BankAccountDialog({ open, onClose, account, onSaved }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.bankName || !form.accountHolderName || !form.accountNumber) {
-      toast({ title: 'Bank name, account holder, and number are required', variant: 'destructive' });
+      toast({
+        title: 'Bank name, account holder, and number are required',
+        variant: 'destructive',
+      });
       return;
     }
     setSaving(true);
@@ -166,10 +169,7 @@ function BankAccountDialog({ open, onClose, account, onSaved }) {
 
           <div className="space-y-1.5">
             <Label>Branch Code</Label>
-            <Input
-              value={form.branchCode}
-              onChange={(e) => set('branchCode', e.target.value)}
-            />
+            <Input value={form.branchCode} onChange={(e) => set('branchCode', e.target.value)} />
           </div>
 
           <DialogFooter>
@@ -202,7 +202,6 @@ export default function BankAccountsPage() {
   } = useFetch(() => bankAccountApi.getAllBankAccounts());
 
   const accounts = raw ?? [];
-
 
   function openCreate() {
     setEditTarget(null);
@@ -284,9 +283,7 @@ export default function BankAccountsPage() {
                     <TableCell>
                       <StatusBadge status={a.accountType ?? 'NON_VAT'} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {a.branchCode ?? '—'}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{a.branchCode ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

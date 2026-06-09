@@ -1,6 +1,5 @@
 import axiosInstance from './axiosInstance';
 
-
 const AUTH = '/user';
 
 const authApi = {
@@ -12,7 +11,7 @@ const authApi = {
 
   /**
    * @param {FormData} formData — fields: username, email, phone, password, aboutMe?, avatar(File)
-   * 
+   *
    */
   register: (formData) =>
     axiosInstance.post(`${AUTH}/register`, formData, {

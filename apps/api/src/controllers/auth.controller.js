@@ -1,20 +1,17 @@
-const crypto = require("crypto");
-const cloudinary = require("cloudinary").v2;
-const streamifier = require("streamifier");
-const nodemailer = require("nodemailer");
-const User = require("../models/user.model");
-const asyncHandler = require("../utils/asyncHandler");
-const { generateToken, clearToken } = require("../services/token.service");
+const crypto = require('crypto');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
+const nodemailer = require('nodemailer');
+const User = require('../models/user.model');
+const asyncHandler = require('../utils/asyncHandler');
+const { generateToken, clearToken } = require('../services/token.service');
 
 const uploadToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: "AVATARS" },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    );
+    const stream = cloudinary.uploader.upload_stream({ folder: 'AVATARS' }, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
     streamifier.createReadStream(buffer).pipe(stream);
   });
 
@@ -40,7 +37,7 @@ const sendEmail = async ({ to, subject, html }) => {
 exports.register = asyncHandler(async (req, res) => {
   const { username, email, phone, password, aboutMe } = req.body;
 
-  let avatar = { public_id: "", url: "" };
+  let avatar = { public_id: '', url: '' };
 
   if (req.file) {
     const result = await uploadToCloudinary(req.file.buffer);
@@ -53,7 +50,7 @@ exports.register = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: "user Registered!",
+    message: 'user Registered!',
     token,
     user: {
       _id: user._id,
@@ -70,28 +67,28 @@ exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ success: false, message: "Email & Password Are Required!" });
+    return res.status(400).json({ success: false, message: 'Email & Password Are Required!' });
   }
 
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({ email }).select('+password');
 
   // TODO: remove after diagnosing login failure — do NOT leave in production
   if (!user) {
-    console.log("[LOGIN DEBUG] No user found for email:", email);
-    return res.status(401).json({ success: false, message: "Invalid Email Or Password!" });
+  
+    return res.status(401).json({ success: false, message: 'Invalid Email Or Password!' });
   }
-  console.log("[LOGIN DEBUG] User found. Stored hash prefix:", user.password?.slice(0, 7));
+
   const passwordMatch = await user.comparePassword(password);
-  console.log("[LOGIN DEBUG] Password match:", passwordMatch);
+
   if (!passwordMatch) {
-    return res.status(401).json({ success: false, message: "Invalid Email Or Password!" });
+    return res.status(401).json({ success: false, message: 'Invalid Email Or Password!' });
   }
 
   const token = generateToken(user, res);
 
   res.status(200).json({
     success: true,
-    message: "LoggedIn",
+    message: 'LoggedIn',
     token,
     user: {
       _id: user._id,
@@ -106,7 +103,7 @@ exports.login = asyncHandler(async (req, res) => {
 
 exports.logout = asyncHandler(async (req, res) => {
   clearToken(res);
-  res.status(200).json({ success: true, message: "Loggout" });
+  res.status(200).json({ success: true, message: 'Loggout' });
 });
 
 exports.getUser = asyncHandler(async (req, res) => {
@@ -144,7 +141,7 @@ exports.updateProfile = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: "Profile Updated",
+    message: 'Profile Updated',
     updatedUser: {
       _id: user._id,
       username: user.username,
@@ -160,26 +157,26 @@ exports.updatePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
   if (!currentPassword || !newPassword || !confirmNewPassword) {
-    return res.status(400).json({ success: false, message: "Please Fill All Fields:" });
+    return res.status(400).json({ success: false, message: 'Please Fill All Fields:' });
   }
 
-  const user = await User.findById(req.user._id).select("+password");
+  const user = await User.findById(req.user._id).select('+password');
 
   if (!(await user.comparePassword(currentPassword))) {
-    return res.status(400).json({ success: false, message: "Incorrect Current Password" });
+    return res.status(400).json({ success: false, message: 'Incorrect Current Password' });
   }
 
   if (newPassword !== confirmNewPassword) {
     return res.status(400).json({
       success: false,
-      message: "New Password And Confirm New Password Do Not Match",
+      message: 'New Password And Confirm New Password Do Not Match',
     });
   }
 
   user.password = newPassword;
   await user.save();
 
-  res.status(200).json({ success: true, message: "Password Updated!" });
+  res.status(200).json({ success: true, message: 'Password Updated!' });
 });
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
@@ -187,7 +184,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email });
 
   if (!user) {
-    return res.status(404).json({ success: false, message: "User Not Found" });
+    return res.status(404).json({ success: false, message: 'User Not Found' });
   }
 
   const resetToken = user.getResetPasswordToken();
@@ -198,7 +195,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   try {
     await sendEmail({
       to: user.email,
-      subject: "Password Reset Request",
+      subject: 'Password Reset Request',
       html: `<p>You requested a password reset. Click the link below to reset your password:</p>
              <a href="${resetUrl}">${resetUrl}</a>
              <p>This link expires in 15 minutes.</p>`,
@@ -218,10 +215,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 });
 
 exports.resetPassword = asyncHandler(async (req, res) => {
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(req.params.token)
-    .digest("hex");
+  const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
 
   const user = await User.findOne({
     resetPasswordToken: hashedToken,
@@ -231,7 +225,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(400).json({
       success: false,
-      message: "Reset Password Token Is Invalid or Has Been Expired!",
+      message: 'Reset Password Token Is Invalid or Has Been Expired!',
     });
   }
 
@@ -240,7 +234,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   if (password !== confirmPassword) {
     return res.status(400).json({
       success: false,
-      message: "Password And ConfirmPassword Do Not Match!",
+      message: 'Password And ConfirmPassword Do Not Match!',
     });
   }
 
@@ -253,7 +247,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: "Reset Password Successfully!",
+    message: 'Reset Password Successfully!',
     token,
   });
 });

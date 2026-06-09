@@ -34,7 +34,9 @@ export default function ProductGallery({ images }) {
               type="button"
               onClick={() => setActiveIndex(i)}
               className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
-                i === activeIndex ? 'border-primary' : 'border-transparent opacity-60 hover:opacity-100'
+                i === activeIndex
+                  ? 'border-primary'
+                  : 'border-transparent opacity-60 hover:opacity-100'
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

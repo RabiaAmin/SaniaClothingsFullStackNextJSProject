@@ -36,14 +36,16 @@ export default function ProductCard({ product, whatsappPhone }) {
           )}
           <div>
             <h3 className="font-semibold leading-tight">{product.name}</h3>
-            <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-              {product.description}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{product.description}</p>
           </div>
         </CardContent>
       </Link>
       <div className="px-4 pb-4">
-        <Button asChild size="sm" className="w-full gap-2 bg-[#25D366] hover:bg-[#1da851] text-white">
+        <Button
+          asChild
+          size="sm"
+          className="w-full gap-2 bg-[#25D366] hover:bg-[#1da851] text-white"
+        >
           <a href={waLink} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-4 w-4" />
             Contact on WhatsApp

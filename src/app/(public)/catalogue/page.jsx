@@ -58,11 +58,7 @@ export default function CataloguePage() {
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
-                <ProductCard
-                  key={product._id}
-                  product={product}
-                  whatsappPhone={business?.phone}
-                />
+                <ProductCard key={product._id} product={product} whatsappPhone={business?.phone} />
               ))}
             </div>
           )}

@@ -136,9 +136,7 @@ export default function AboutPage() {
         <div className="container mx-auto max-w-2xl">
           <div className="mb-10 text-center">
             <h2 className="text-3xl font-bold tracking-tight">Our Journey</h2>
-            <p className="mt-2 text-muted-foreground">
-              Key milestones in building Sania Clothing.
-            </p>
+            <p className="mt-2 text-muted-foreground">Key milestones in building Sania Clothing.</p>
           </div>
           <div className="flex flex-col">
             {timeline.map(({ year, event }, index) => (
