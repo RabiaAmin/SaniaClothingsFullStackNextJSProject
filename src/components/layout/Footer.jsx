@@ -44,12 +44,18 @@ export default function Footer() {
             <p className="mb-3 text-sm font-semibold">Contact</p>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               {business?.email && (
-                <a href={`mailto:${business.email}`} className="hover:text-foreground transition-colors">
+                <a
+                  href={`mailto:${business.email}`}
+                  className="hover:text-foreground transition-colors"
+                >
                   {business.email}
                 </a>
               )}
               {business?.phone && (
-                <a href={`tel:${business.phone}`} className="hover:text-foreground transition-colors">
+                <a
+                  href={`tel:${business.phone}`}
+                  className="hover:text-foreground transition-colors"
+                >
                   {business.phone}
                 </a>
               )}

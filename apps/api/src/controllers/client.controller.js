@@ -1,5 +1,5 @@
-const Client = require("../models/client.model");
-const asyncHandler = require("../utils/asyncHandler");
+const Client = require('../models/client.model');
+const asyncHandler = require('../utils/asyncHandler');
 
 exports.addClient = asyncHandler(async (req, res) => {
   const {
@@ -28,27 +28,27 @@ exports.addClient = asyncHandler(async (req, res) => {
     vatRate,
   });
 
-  res.status(201).json({ success: true, message: "Client added successfully", client });
+  res.status(201).json({ success: true, message: 'Client added successfully', client });
 });
 
 exports.updateClient = asyncHandler(async (req, res) => {
   const client = await Client.findById(req.params.id);
 
   if (!client) {
-    return res.status(404).json({ success: false, message: "Client not found" });
+    return res.status(404).json({ success: false, message: 'Client not found' });
   }
 
   const fields = [
-    "name",
-    "email",
-    "phone",
-    "telphone",
-    "address",
-    "registrationNumber",
-    "vatNumber",
-    "fax",
-    "vatApplicable",
-    "vatRate",
+    'name',
+    'email',
+    'phone',
+    'telphone',
+    'address',
+    'registrationNumber',
+    'vatNumber',
+    'fax',
+    'vatApplicable',
+    'vatRate',
   ];
 
   fields.forEach((field) => {
@@ -57,26 +57,26 @@ exports.updateClient = asyncHandler(async (req, res) => {
 
   await client.save();
 
-  res.status(200).json({ success: true, message: "Client updated successfully", client });
+  res.status(200).json({ success: true, message: 'Client updated successfully', client });
 });
 
 exports.deleteClient = asyncHandler(async (req, res) => {
   const client = await Client.findById(req.params.id);
 
   if (!client) {
-    return res.status(404).json({ success: false, message: "Client not found" });
+    return res.status(404).json({ success: false, message: 'Client not found' });
   }
 
   await client.deleteOne();
 
-  res.status(200).json({ success: true, message: "Client deleted successfully", client });
+  res.status(200).json({ success: true, message: 'Client deleted successfully', client });
 });
 
 exports.getClient = asyncHandler(async (req, res) => {
   const client = await Client.findById(req.params.id);
 
   if (!client) {
-    return res.status(404).json({ success: false, message: "Client not found" });
+    return res.status(404).json({ success: false, message: 'Client not found' });
   }
 
   res.status(200).json({ success: true, client });

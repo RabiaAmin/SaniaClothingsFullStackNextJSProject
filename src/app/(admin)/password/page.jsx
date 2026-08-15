@@ -64,6 +64,7 @@ export default function PasswordPage() {
       await authApi.changePassword({
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
+        confirmNewPassword: form.confirmPassword,
       });
       setSuccess(true);
       setForm(EMPTY);

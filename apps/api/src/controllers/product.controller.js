@@ -1,12 +1,12 @@
-const cloudinary = require("cloudinary").v2;
-const streamifier = require("streamifier");
-const Product = require("../models/product.model");
-const asyncHandler = require("../utils/asyncHandler");
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
+const Product = require('../models/product.model');
+const asyncHandler = require('../utils/asyncHandler');
 
 const uploadToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: "PRODUCTS", quality: "auto" },
+      { folder: 'PRODUCTS', quality: 'auto' },
       (error, result) => {
         if (error) return reject(error);
         resolve(result);
@@ -31,19 +31,19 @@ exports.createProduct = asyncHandler(async (req, res) => {
   const product = await Product.create({
     name,
     description,
-    category: category || "",
+    category: category || '',
     images,
     stock: Number(stock) || 0,
-    isActive: isActive === undefined ? true : isActive === "true" || isActive === true,
+    isActive: isActive === undefined ? true : isActive === 'true' || isActive === true,
   });
 
-  res.status(201).json({ success: true, message: "Product created successfully", product });
+  res.status(201).json({ success: true, message: 'Product created successfully', product });
 });
 
 exports.updateProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) {
-    return res.status(404).json({ success: false, message: "Product not found" });
+    return res.status(404).json({ success: false, message: 'Product not found' });
   }
 
   const { name, description, category, stock, isActive, existingImages } = req.body;
@@ -52,7 +52,7 @@ exports.updateProduct = asyncHandler(async (req, res) => {
   if (description !== undefined) product.description = description;
   if (category !== undefined) product.category = category;
   if (stock !== undefined) product.stock = Number(stock);
-  if (isActive !== undefined) product.isActive = isActive === "true" || isActive === true;
+  if (isActive !== undefined) product.isActive = isActive === 'true' || isActive === true;
 
   let kept = [];
   if (existingImages) {
@@ -67,13 +67,13 @@ exports.updateProduct = asyncHandler(async (req, res) => {
   product.images = [...kept, ...newUploads];
 
   await product.save();
-  res.status(200).json({ success: true, message: "Product updated successfully", product });
+  res.status(200).json({ success: true, message: 'Product updated successfully', product });
 });
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) {
-    return res.status(404).json({ success: false, message: "Product not found" });
+    return res.status(404).json({ success: false, message: 'Product not found' });
   }
 
   await Promise.all(
@@ -83,13 +83,13 @@ exports.deleteProduct = asyncHandler(async (req, res) => {
   );
 
   await product.deleteOne();
-  res.status(200).json({ success: true, message: "Product deleted successfully", product });
+  res.status(200).json({ success: true, message: 'Product deleted successfully', product });
 });
 
 exports.getProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) {
-    return res.status(404).json({ success: false, message: "Product not found" });
+    return res.status(404).json({ success: false, message: 'Product not found' });
   }
   res.status(200).json({ success: true, product });
 });
@@ -98,12 +98,12 @@ exports.getAllProducts = asyncHandler(async (req, res) => {
   const { search, category, limit, active } = req.query;
 
   const filter = {};
-  if (active === "true") filter.isActive = true;
-  if (category) filter.category = { $regex: category, $options: "i" };
+  if (active === 'true') filter.isActive = true;
+  if (category) filter.category = { $regex: category, $options: 'i' };
   if (search) {
     filter.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { description: { $regex: search, $options: "i" } },
+      { name: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
     ];
   }
 

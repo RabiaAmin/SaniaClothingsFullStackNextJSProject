@@ -13,6 +13,7 @@ dist/
 
 # Environment files - never commit secrets
 .env
+.env.docker
 .env.local
 .env.production
 .env.*.local
@@ -26,6 +27,8 @@ apps/api/.evn.production
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+playwright-report/
+test-results/
 
 # OS files
 .DS_Store

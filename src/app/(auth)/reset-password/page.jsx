@@ -67,7 +67,10 @@ function ResetPasswordForm() {
 
     setIsSubmitting(true);
     try {
-      await authApi.resetPassword({ token, password: formData.password });
+      await authApi.resetPassword(token, {
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+      });
       toast({
         title: 'Password updated',
         description: 'You can now sign in with your new password.',

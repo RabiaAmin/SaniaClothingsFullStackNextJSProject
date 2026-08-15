@@ -1,9 +1,9 @@
 const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
-  let message = err.message || "Internal Server Error";
+  let message = err.message || 'Internal Server Error';
 
-  if (err.name === "CastError") {
-    message = "Resource not found";
+  if (err.name === 'CastError') {
+    message = 'Resource not found';
     statusCode = 404;
   }
 
@@ -13,13 +13,13 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 400;
   }
 
-  if (err.name === "JsonWebTokenError") {
-    message = "Invalid token";
+  if (err.name === 'JsonWebTokenError') {
+    message = 'Invalid token';
     statusCode = 401;
   }
 
-  if (err.name === "TokenExpiredError") {
-    message = "Token expired";
+  if (err.name === 'TokenExpiredError') {
+    message = 'Token expired';
     statusCode = 401;
   }
 

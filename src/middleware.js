@@ -2,7 +2,19 @@ import { NextResponse } from 'next/server';
 
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'token';
 
-const PROTECTED_PATHS = [
+const STATIC_PUBLIC_PATHS = new Set([
+  '/',
+  '/about',
+  '/contact',
+  '/services',
+  '/products',
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+]);
+
+const ADMIN_PATHS = [
   '/admin',
   '/dashboard',
   '/invoices',
@@ -12,19 +24,26 @@ const PROTECTED_PATHS = [
   '/password',
 ];
 
-function isProtectedPath(pathname) {
-  return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+function isPublicPath(pathname) {
+  return STATIC_PUBLIC_PATHS.has(pathname) || pathname.startsWith('/products/');
+}
+
+function isAdminPath(pathname) {
+  return ADMIN_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (!isProtectedPath(pathname)) return NextResponse.next();
+  if (isPublicPath(pathname) || !isAdminPath(pathname)) {
+    return NextResponse.next();
+  }
 
   const hasSession = request.cookies.has(COOKIE_NAME);
   if (!hasSession) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
+    loginUrl.search = '';
     return NextResponse.redirect(loginUrl);
   }
 
@@ -32,7 +51,5 @@ export function middleware(request) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.[^/]+$).*)'],
 };

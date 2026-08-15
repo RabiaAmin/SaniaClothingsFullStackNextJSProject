@@ -1,6 +1,5 @@
 import axiosInstance from './axiosInstance';
 
-
 const AUTH = '/user';
 
 const authApi = {
@@ -12,7 +11,7 @@ const authApi = {
 
   /**
    * @param {FormData} formData — fields: username, email, phone, password, aboutMe?, avatar(File)
-   * 
+   *
    */
   register: (formData) =>
     axiosInstance.post(`${AUTH}/register`, formData, {
@@ -43,9 +42,8 @@ const authApi = {
   /**
    * @param {{ currentPassword: string, newPassword: string, confirmNewPassword: string }} payload
 
-   * NOTE: "pawssord" is intentional — matches the backend route typo exactly.
    */
-  changePassword: (payload) => axiosInstance.put(`${AUTH}/update/pawssord`, payload),
+  changePassword: (payload) => axiosInstance.put(`${AUTH}/update/password`, payload),
 
   /**
    * @param {{ email: string }} payload

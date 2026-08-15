@@ -1,17 +1,17 @@
-require("./config/env");
-const express = require("express");
+require('./config/env');
+const express = require('express');
 
-const cookieParser = require("cookie-parser");
-const cors = require("cors");
-const cloudinary = require("cloudinary").v2;
-const errorHandler = require("./middleware/error.middleware");
+const cookieParser = require('cookie-parser');
+const cors = require('cors');
+const cloudinary = require('cloudinary').v2;
+const errorHandler = require('./middleware/error.middleware');
 
-const authRoutes = require("./routes/auth.routes");
-const businessRoutes = require("./routes/business.routes");
-const clientRoutes = require("./routes/client.routes");
-const invoiceRoutes = require("./routes/invoice.routes");
-const bankAccountRoutes = require("./routes/bankAccount.routes");
-const productRoutes = require("./routes/product.routes");
+const authRoutes = require('./routes/auth.routes');
+const businessRoutes = require('./routes/business.routes');
+const clientRoutes = require('./routes/client.routes');
+const invoiceRoutes = require('./routes/invoice.routes');
+const bankAccountRoutes = require('./routes/bankAccount.routes');
+const productRoutes = require('./routes/product.routes');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -20,10 +20,23 @@ cloudinary.config({
 });
 
 const app = express();
+app.set("trust proxy", 1);
+
+const allowedOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -31,6 +44,10 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ success: true, status: "ok" });
+});
 
 app.use("/api/v1/user", authRoutes);
 app.use("/api/v1/business/invoice", invoiceRoutes);

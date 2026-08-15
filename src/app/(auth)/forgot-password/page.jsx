@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
     } catch (err) {
       // Show a generic message to prevent email enumeration
       setSubmitted(true);
-      // Optionally log: console.warn(err)
+   
       void err;
     } finally {
       setIsSubmitting(false);

@@ -77,7 +77,6 @@ export default function HomePage() {
 
           {/* Three-column grid */}
           <div className="relative z-10 mx-auto grid min-h-[92vh] max-w-screen-xl grid-cols-1 px-6 md:grid-cols-[2fr_3fr_2fr] md:px-10">
-
             {/* ── Left column: text + CTA ── */}
             <div className="flex flex-col justify-end gap-6 pb-14 pt-8 md:py-20 order-2 md:order-1">
               <span className="w-fit rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
@@ -86,11 +85,13 @@ export default function HomePage() {
 
               <div className="flex flex-col gap-2">
                 <h1 className="text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl">
-                  Crafted<br />
+                  Crafted
+                  <br />
                   <span className="text-primary">with Precision.</span>
                 </h1>
                 <p className="mt-2 max-w-[22ch] text-base leading-relaxed text-white/50">
-                  Inspired by craftsmanship.<br />
+                  Inspired by craftsmanship.
+                  <br />
                   Designed for modern brands.
                 </p>
               </div>
@@ -159,7 +160,9 @@ export default function HomePage() {
                     New
                   </span>
                   <p className="text-xs leading-tight text-white/50">
-                    Latest<br />Collection
+                    Latest
+                    <br />
+                    Collection
                   </p>
                 </div>
               </div>
@@ -211,9 +214,7 @@ export default function HomePage() {
         <section className="px-4 py-20">
           <div className="container mx-auto grid gap-12 md:grid-cols-2 md:items-center">
             <div>
-              <h2 className="mb-4 text-3xl font-bold tracking-tight">
-                Why Choose Sania Clothing?
-              </h2>
+              <h2 className="mb-4 text-3xl font-bold tracking-tight">Why Choose Sania Clothing?</h2>
               <p className="mb-8 text-muted-foreground">
                 We combine years of industry experience with a commitment to quality, making us the
                 trusted manufacturing partner for garment businesses.
@@ -232,10 +233,7 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {stats.map(({ value, label }) => (
-                <div
-                  key={label}
-                  className="rounded-xl border bg-card p-6 text-center shadow-sm"
-                >
+                <div key={label} className="rounded-xl border bg-card p-6 text-center shadow-sm">
                   <p className="text-3xl font-bold text-primary">{value}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{label}</p>
                 </div>
