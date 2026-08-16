@@ -6,8 +6,6 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
-    env_file:
-      - ./apps/api/.env.production
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -21,6 +19,11 @@ services:
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SERVICE: ${SMTP_SERVICE:-gmail}
+      SMTP_MAIL: ${SMTP_MAIL:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
 
   frontend:
     build:

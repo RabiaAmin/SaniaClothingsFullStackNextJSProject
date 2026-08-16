@@ -22,6 +22,7 @@ apps/api/.env.development
 apps/api/.env.production
 apps/api/.env.*.local
 apps/api/.evn.production
+docker-compose-local.yml
 
 # Logs
 npm-debug.log*
