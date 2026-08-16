@@ -15,24 +15,27 @@ const uploadToCloudinary = (buffer) =>
     streamifier.createReadStream(buffer).pipe(stream);
   });
 
-const sendEmail = async ({ to, subject, html }) => {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    service: process.env.SMTP_SERVICE,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to,
-    subject,
-    html,
-  });
-};
+ const sendEmail = async(option) =>{
+    const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        service: process.env.SMTP_SERVICE,
+        auth: {
+            user: process.env.SMTP_MAIL,
+            pass: process.env.SMTP_PASSWORD, 
+        }
+    });
+
+    const mailOptions = {
+        from : process.env.SMTP_MAIL,
+        to: option.email,
+        subject: option.subject,
+        text: option.text,
+    }
+
+    await transporter.sendMail(mailOptions);
+}
 
 exports.register = asyncHandler(async (req, res) => {
   const { username, email, phone, password, aboutMe } = req.body;
@@ -188,17 +191,20 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   }
 
   const resetToken = user.getResetPasswordToken();
+
   await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
+  const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+    const message = `Your Reset Password Token is : \n \n ${resetUrl} \n \n If You'r Not Request For This Please Ignore It.`;
+
 
   try {
     await sendEmail({
-      to: user.email,
+      email: user.email,
       subject: 'Password Reset Request',
-      html: `<p>You requested a password reset. Click the link below to reset your password:</p>
-             <a href="${resetUrl}">${resetUrl}</a>
-             <p>This link expires in 15 minutes.</p>`,
+      text: message,
     });
 
     res.status(200).json({
@@ -206,6 +212,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
       message: `Email Sent to ${user.email} Successfully!`,
     });
   } catch (err) {
+    console.error('Failed to send password reset email:', err.message);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save({ validateBeforeSave: false });

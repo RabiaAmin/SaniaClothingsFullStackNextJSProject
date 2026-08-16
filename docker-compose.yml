@@ -6,10 +6,12 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
+    env_file:
+      - ./apps/api/.env.production
     environment:
       NODE_ENV: production
       PORT: 4000
-      MONGO_URI: ${MONGO_URI:?Set MONGO_URI in .env.docker}
+      MONGO_URI: ${MONGO_URI:-mongodb://host.docker.internal:27017/SANIACLOTHING}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:-change-this-before-production}
@@ -19,12 +21,6 @@ services:
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SERVICE: ${SMTP_SERVICE:-}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
 
   frontend:
     build:
