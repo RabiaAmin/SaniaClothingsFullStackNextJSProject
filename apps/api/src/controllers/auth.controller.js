@@ -17,18 +17,26 @@ const uploadToCloudinary = (buffer) =>
 
 
  const sendEmail = async(option) =>{
+    const smtpMail = process.env.SMTP_MAIL || process.env.SMTP_USER;
+    const smtpPassword = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
+
+    if (!process.env.SMTP_HOST || !smtpMail || !smtpPassword) {
+      throw new Error('SMTP is not configured on the server');
+    }
+
     const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: Number(process.env.SMTP_PORT) === 465,
         service: process.env.SMTP_SERVICE,
         auth: {
-            user: process.env.SMTP_MAIL,
-            pass: process.env.SMTP_PASSWORD, 
+            user: smtpMail,
+            pass: smtpPassword,
         }
     });
 
     const mailOptions = {
-        from : process.env.SMTP_MAIL,
+        from: process.env.SMTP_FROM || smtpMail,
         to: option.email,
         subject: option.subject,
         text: option.text,

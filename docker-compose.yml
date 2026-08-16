@@ -22,8 +22,8 @@ services:
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_SERVICE: ${SMTP_SERVICE:-gmail}
-      SMTP_MAIL: ${SMTP_MAIL:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_MAIL: ${SMTP_MAIL:-${SMTP_USER:-}}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-${SMTP_PASS:-}}
 
   frontend:
     build:
