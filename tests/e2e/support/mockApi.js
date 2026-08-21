@@ -4,8 +4,11 @@ const business = {
   name: 'Sania Clothing',
   email: 'hello@sania.test',
   phone: '+27 82 555 0100',
+  telPhone: '+27 21 555 0101',
   address: 'Cape Town, South Africa',
   vatNumber: 'VAT-123',
+  ckNumber: 'CK-456',
+  fax: '+27 21 555 0102',
   currency: 'ZAR',
 };
 
@@ -239,7 +242,11 @@ async function mockApi(page) {
       });
     }
     if (method === 'GET' && path.startsWith('/business/invoice/get/')) {
-      return response(route, { success: true, invoice: invoices[0], bankAccount: bankAccounts[0] });
+      return response(route, {
+        success: true,
+        invoice: { ...invoices[0], fromBusiness: business, toClient: clients[0] },
+        bankAccount: bankAccounts[0],
+      });
     }
     if (method === 'GET' && path === '/business/invoice/weekly-statements') {
       return response(route, {

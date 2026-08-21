@@ -209,8 +209,11 @@ export default function ViewInvoicePage() {
             <p className="mb-1 font-bold">From:</p>
             <p className="font-semibold">{biz.name ?? '—'}</p>
             {biz.vatNumber && <p>VAT No: {biz.vatNumber}</p>}
+            {biz.ckNumber && <p>CK No: {biz.ckNumber}</p>}
             {biz.address && <p>{biz.address}</p>}
-            {biz.phone && <p>Tel: {biz.phone}</p>}
+            {biz.telPhone && <p>Tel: {biz.telPhone}</p>}
+            {biz.phone && <p>Phone: {biz.phone}</p>}
+            {biz.fax && <p>Fax: {biz.fax}</p>}
             {biz.email && <p>{biz.email}</p>}
           </div>
 

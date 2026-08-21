@@ -81,6 +81,66 @@ test('signed-in admin feature pages render with mocked data', async ({ page }) =
   }
 });
 
+test('invoice view renders every business detail from the API response', async ({ page }) => {
+  await mockApi(page);
+  await signInAsAdmin(page);
+
+  await page.goto('/invoices/invoice-1');
+
+  const invoice = page.locator('#invoice-print');
+  await expect(invoice.getByText('Sania Clothing')).toBeVisible();
+  await expect(invoice.getByText('VAT No: VAT-123')).toBeVisible();
+  await expect(invoice.getByText('CK No: CK-456')).toBeVisible();
+  await expect(invoice.getByText('Cape Town, South Africa')).toBeVisible();
+  await expect(invoice.getByText('Tel: +27 21 555 0101')).toBeVisible();
+  await expect(invoice.getByText('Phone: +27 82 555 0100')).toBeVisible();
+  await expect(invoice.getByText('Fax: +27 21 555 0102')).toBeVisible();
+  await expect(invoice.getByText('hello@sania.test')).toBeVisible();
+});
+
+test('business profile displays and submits every API business field', async ({ page }) => {
+  const calls = await mockApi(page);
+  await signInAsAdmin(page);
+
+  await page.goto('/business');
+
+  await expect(page.getByText('Telephone:')).toBeVisible();
+  await expect(page.getByText('+27 21 555 0101')).toBeVisible();
+  await expect(page.getByText('CK:')).toBeVisible();
+  await expect(page.getByText('CK-456')).toBeVisible();
+  await expect(page.getByText('Fax:')).toBeVisible();
+  await expect(page.getByText('+27 21 555 0102')).toBeVisible();
+
+  await page.getByRole('button', { name: /Add Business/i }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('[name="name"]').fill('Complete Business');
+  await dialog.locator('[name="email"]').fill('complete@example.com');
+  await dialog.locator('[name="phone"]').fill('0820000000');
+  await dialog.locator('[name="telPhone"]').fill('0210000000');
+  await dialog.locator('[name="address"]').fill('1 Main Road');
+  await dialog.locator('[name="vatNumber"]').fill('VAT-999');
+  await dialog.locator('[name="ckNumber"]').fill('CK-999');
+  await dialog.locator('[name="fax"]').fill('0210000001');
+  await dialog.getByRole('button', { name: 'Create' }).click();
+
+  expect(calls).toContainEqual(
+    expect.objectContaining({
+      method: 'POST',
+      path: '/business/create',
+      payload: expect.objectContaining({
+        name: 'Complete Business',
+        email: 'complete@example.com',
+        phone: '0820000000',
+        telPhone: '0210000000',
+        address: '1 Main Road',
+        vatNumber: 'VAT-999',
+        ckNumber: 'CK-999',
+        fax: '0210000001',
+      }),
+    })
+  );
+});
+
 test('password manager calls the corrected update/password endpoint', async ({ page }) => {
   const calls = await mockApi(page);
   await signInAsAdmin(page);

@@ -34,8 +34,11 @@ const EMPTY = () => ({
   name: '',
   email: '',
   phone: '',
+  telPhone: '',
   address: '',
   vatNumber: '',
+  ckNumber: '',
+  fax: '',
   logoUrl: '',
   currency: 'ZAR',
 });
@@ -53,8 +56,11 @@ function BusinessDialog({ open, onClose, business, onSaved }) {
             name: business.name ?? '',
             email: business.email ?? '',
             phone: business.phone ?? '',
+            telPhone: business.telPhone ?? '',
             address: business.address ?? '',
             vatNumber: business.vatNumber ?? '',
+            ckNumber: business.ckNumber ?? '',
+            fax: business.fax ?? '',
             logoUrl: business.logoUrl ?? '',
             currency: business.currency ?? 'ZAR',
           }
@@ -100,6 +106,7 @@ function BusinessDialog({ open, onClose, business, onSaved }) {
           <div className="space-y-1.5">
             <Label>Business Name *</Label>
             <Input
+              name="name"
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="Acme Corp"
@@ -110,29 +117,71 @@ function BusinessDialog({ open, onClose, business, onSaved }) {
             <div className="space-y-1.5">
               <Label>Email</Label>
               <Input
+                name="email"
                 type="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Phone</Label>
-              <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+              <Label>Mobile Phone</Label>
+              <Input
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Telephone</Label>
+              <Input
+                name="telPhone"
+                type="tel"
+                value={form.telPhone}
+                onChange={(e) => set('telPhone', e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fax</Label>
+              <Input
+                name="fax"
+                type="tel"
+                value={form.fax}
+                onChange={(e) => set('fax', e.target.value)}
+              />
             </div>
           </div>
           <div className="space-y-1.5">
             <Label>Address</Label>
-            <Input value={form.address} onChange={(e) => set('address', e.target.value)} />
+            <Input
+              name="address"
+              value={form.address}
+              onChange={(e) => set('address', e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>VAT Number</Label>
               <Input
+                name="vatNumber"
                 value={form.vatNumber}
                 onChange={(e) => set('vatNumber', e.target.value)}
                 placeholder="Optional"
               />
             </div>
+            <div className="space-y-1.5">
+              <Label>CK Number</Label>
+              <Input
+                name="ckNumber"
+                value={form.ckNumber}
+                onChange={(e) => set('ckNumber', e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Currency</Label>
               <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
@@ -152,6 +201,7 @@ function BusinessDialog({ open, onClose, business, onSaved }) {
           <div className="space-y-1.5">
             <Label>Logo URL</Label>
             <Input
+              name="logoUrl"
               type="url"
               value={form.logoUrl}
               onChange={(e) => set('logoUrl', e.target.value)}
@@ -176,11 +226,14 @@ function BusinessDialog({ open, onClose, business, onSaved }) {
 // ── Business Card ─────────────────────────────────────────────────────────────
 function BusinessCard({ business, onEdit }) {
   const rows = [
-    { icon: Mail, value: business.email },
-    { icon: Phone, value: business.phone },
-    { icon: MapPin, value: business.address },
+    { icon: Mail, value: business.email, label: 'Email' },
+    { icon: Phone, value: business.phone, label: 'Mobile' },
+    { icon: Phone, value: business.telPhone, label: 'Telephone' },
+    { icon: MapPin, value: business.address, label: 'Address' },
     { icon: Hash, value: business.vatNumber, label: 'VAT' },
-    { icon: Globe, value: business.currency },
+    { icon: Hash, value: business.ckNumber, label: 'CK' },
+    { icon: Phone, value: business.fax, label: 'Fax' },
+    { icon: Globe, value: business.currency, label: 'Currency' },
   ].filter((r) => r.value);
 
   return (
@@ -209,7 +262,7 @@ function BusinessCard({ business, onEdit }) {
       </CardHeader>
       <CardContent className="space-y-2">
         {rows.map(({ icon: Icon, value, label }) => (
-          <div key={value} className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div key={label} className="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon className="h-3.5 w-3.5 shrink-0" />
             {label && <span className="font-medium text-foreground">{label}:</span>}
             <span>{value}</span>
@@ -290,7 +343,7 @@ export default function BusinessPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {businesses.map((b) => (
-            <BusinessCard key={b.id} business={b} onEdit={openEdit} />
+            <BusinessCard key={b._id ?? b.id} business={b} onEdit={openEdit} />
           ))}
         </div>
       )}
