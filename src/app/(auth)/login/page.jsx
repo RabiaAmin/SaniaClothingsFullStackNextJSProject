@@ -38,9 +38,9 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login(formData);
+      const user = await login(formData);
       toast({ title: 'Welcome back!', description: 'You are now signed in.' });
-      router.push('/dashboard');
+      router.push(user?.mustChangePassword ? '/change-password' : '/dashboard');
     } catch (err) {
       setError(err.message ?? 'Invalid credentials. Please try again.');
     } finally {

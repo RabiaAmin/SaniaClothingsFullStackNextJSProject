@@ -111,7 +111,79 @@ const user = {
   phone: '+27 82 555 0999',
   aboutMe: 'Admin user',
   avatar: { public_id: 'avatar-1', url: '' },
+  isActive: true,
+  mustChangePassword: false,
+  role: { _id: 'role-admin', name: 'Admin', slug: 'admin' },
+  permissions: ['*'],
 };
+
+const permissions = [
+  { _id: 'permission-all', key: '*', resource: '*', action: '*', description: 'Full access' },
+  {
+    _id: 'permission-invoice',
+    key: 'invoice.*',
+    resource: 'invoice',
+    action: '*',
+    description: 'Manage invoices',
+  },
+  {
+    _id: 'permission-client',
+    key: 'client.*',
+    resource: 'client',
+    action: '*',
+    description: 'Manage clients',
+  },
+  {
+    _id: 'permission-entry-own',
+    key: 'production_entry.read_own',
+    resource: 'production_entry',
+    action: 'read_own',
+    description: 'View own entries',
+  },
+];
+
+const roles = [
+  {
+    _id: 'role-admin',
+    name: 'Admin',
+    slug: 'admin',
+    description: 'Full access',
+    isSystem: true,
+    isActive: true,
+    assignedUserCount: 1,
+    permissions: [permissions[0]],
+  },
+  {
+    _id: 'role-worker',
+    name: 'Worker',
+    slug: 'worker',
+    description: 'Production worker',
+    isSystem: true,
+    isActive: true,
+    assignedUserCount: 0,
+    permissions: [permissions[3]],
+  },
+  {
+    _id: 'role-invoice',
+    name: 'Invoice Manager',
+    slug: 'invoice-manager',
+    description: 'Invoice access',
+    isSystem: true,
+    isActive: true,
+    assignedUserCount: 0,
+    permissions: [permissions[1], permissions[2]],
+  },
+  {
+    _id: 'role-auditor',
+    name: 'Custom Auditor',
+    slug: 'custom-auditor',
+    description: 'Read-only custom access',
+    isSystem: false,
+    isActive: false,
+    assignedUserCount: 0,
+    permissions: [],
+  },
+];
 
 function response(route, body, status = 200, headers = {}) {
   return route.fulfill({
@@ -133,8 +205,13 @@ async function readPayload(route) {
   return request.postData();
 }
 
-async function mockApi(page) {
+async function mockApi(page, options = {}) {
   const calls = [];
+  const currentUser = options.user ?? user;
+  let sessionUser = currentUser;
+  let createdUser = null;
+  let createdUserPassword = null;
+  const managedUsers = [currentUser];
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
@@ -149,10 +226,27 @@ async function mockApi(page) {
     calls.push({ method, path, payload: method === 'GET' ? null : await readPayload(route) });
 
     if (method === 'GET' && path === '/user/getUser') {
-      return response(route, { success: true, user });
+      return response(route, { success: true, user: sessionUser });
     }
     if (method === 'POST' && path === '/user/login') {
-      return response(route, { success: true, token: 'test-token', user }, 200, {
+      const credentials = await readPayload(route);
+      if (createdUser && credentials.email === createdUser.email) {
+        if (credentials.password !== createdUserPassword) {
+          return response(route, { success: false, message: 'Invalid Email Or Password!' }, 401);
+        }
+        sessionUser = createdUser;
+      }
+      const pageOrigin = new URL(page.url()).origin;
+      await page.context().addCookies([
+        {
+          name: 'token',
+          value: 'test-token',
+          url: pageOrigin,
+          httpOnly: true,
+          sameSite: 'Lax',
+        },
+      ]);
+      return response(route, { success: true, token: 'test-token', user: sessionUser }, 200, {
         'set-cookie': 'token=test-token; Path=/; SameSite=Lax; HttpOnly',
       });
     }
@@ -160,6 +254,15 @@ async function mockApi(page) {
       return response(route, { success: true });
     }
     if (method === 'PUT' && path === '/user/update/password') {
+      if (createdUser && sessionUser._id === createdUser._id) {
+        const payload = await readPayload(route);
+        if (payload.currentPassword !== createdUserPassword) {
+          return response(route, { success: false, message: 'Incorrect Current Password' }, 400);
+        }
+        createdUserPassword = payload.newPassword;
+        createdUser = { ...createdUser, mustChangePassword: false };
+        sessionUser = createdUser;
+      }
       return response(route, { success: true, message: 'Password Updated!' });
     }
     if (method === 'POST' && path === '/user/password/forgot') {
@@ -169,10 +272,63 @@ async function mockApi(page) {
       return response(route, { success: true, token: 'reset-token' });
     }
 
+    if (method === 'GET' && path === '/roles') {
+      return response(route, { success: true, roles });
+    }
+    if (method === 'GET' && path === '/roles/permissions') {
+      return response(route, { success: true, permissions });
+    }
+    if (method === 'GET' && path.startsWith('/roles/') && path.endsWith('/users')) {
+      const roleId = path.split('/')[2];
+      const role = roles.find((item) => item._id === roleId);
+      const users = currentUser.role?._id === roleId ? [currentUser] : [];
+      return response(route, { success: true, role, users });
+    }
+    if (method === 'POST' && path === '/roles') {
+      return response(route, { success: true, role: roles[1] }, 201);
+    }
+    if (method === 'PUT' && path.startsWith('/roles/')) {
+      return response(route, { success: true, role: roles[1] });
+    }
+    if (method === 'DELETE' && path.startsWith('/roles/')) {
+      return response(route, { success: true });
+    }
+    if (method === 'GET' && path === '/users') {
+      return response(route, { success: true, users: managedUsers });
+    }
+    if (method === 'POST' && path === '/users') {
+      const payload = await readPayload(route);
+      const role = roles.find((item) => item._id === payload.roleId);
+      createdUserPassword = 'TempWorkerA1!secure';
+      createdUser = {
+        _id: 'user-created-worker',
+        username: payload.username,
+        email: payload.email,
+        phone: payload.phone,
+        aboutMe: payload.aboutMe || 'Internal user account',
+        isActive: true,
+        mustChangePassword: true,
+        role: { _id: role._id, name: role.name, slug: role.slug },
+        permissions: ['production_order.read', 'production_entry.read_own'],
+      };
+      managedUsers.push(createdUser);
+      return response(
+        route,
+        { success: true, user: createdUser, temporaryPassword: createdUserPassword },
+        201
+      );
+    }
+    if (method === 'PUT' && path.startsWith('/users/')) {
+      return response(route, { success: true, user: currentUser });
+    }
+
     if (method === 'GET' && path === '/business/get') {
       return response(route, { success: true, business });
     }
-    if ((method === 'POST' && path === '/business/create') || (method === 'PUT' && path === '/business/update')) {
+    if (
+      (method === 'POST' && path === '/business/create') ||
+      (method === 'PUT' && path === '/business/update')
+    ) {
       return response(route, { success: true, business });
     }
 
@@ -213,7 +369,10 @@ async function mockApi(page) {
     }
     if (method === 'GET' && path.startsWith('/product/get/')) {
       const id = path.split('/').pop();
-      return response(route, { success: true, product: products.find((p) => p._id === id) ?? products[0] });
+      return response(route, {
+        success: true,
+        product: products.find((p) => p._id === id) ?? products[0],
+      });
     }
     if (method === 'POST' && path === '/product/create') {
       return response(route, { success: true, product: products[0] }, 201);
@@ -274,7 +433,11 @@ async function mockApi(page) {
       return response(route, { success: true });
     }
 
-    return response(route, { success: false, message: `Unhandled mock route: ${method} ${path}` }, 500);
+    return response(
+      route,
+      { success: false, message: `Unhandled mock route: ${method} ${path}` },
+      500
+    );
   });
 
   return calls;

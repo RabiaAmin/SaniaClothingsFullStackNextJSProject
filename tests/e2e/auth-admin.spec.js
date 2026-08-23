@@ -14,7 +14,7 @@ test('login submits credentials and opens the dashboard', async ({ page }) => {
 
   await page.goto('/login');
   await page.getByLabel('Email address').fill('admin@sania.test');
-  await page.getByLabel('Password').fill('Password123');
+  await page.getByLabel('Password', { exact: true }).fill('Password123');
   await page.getByRole('button', { name: /^Sign in$/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -37,7 +37,7 @@ test('forgot password and reset password call the expected auth endpoints', asyn
   await expect(page.getByText(/check your inbox/i)).toBeVisible();
 
   await page.goto('/reset-password?token=reset-token');
-  await page.getByLabel('New password').fill('NewPassword123');
+  await page.getByLabel('New password', { exact: true }).fill('NewPassword123');
   await page.getByLabel('Confirm new password').fill('NewPassword123');
   await page.getByRole('button', { name: /Update password/i }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -72,6 +72,8 @@ test('signed-in admin feature pages render with mocked data', async ({ page }) =
     ['/bank-accounts', 'Bank Account Manager'],
     ['/password', 'Password Manager'],
     ['/admin/products', 'Product Manager'],
+    ['/users', 'User Access'],
+    ['/roles', 'Roles & Permissions'],
   ];
 
   for (const [route, heading] of routes) {
@@ -81,6 +83,44 @@ test('signed-in admin feature pages render with mocked data', async ({ page }) =
   }
 });
 
+test('worker cannot open invoice administration or trigger invoice queries', async ({ page }) => {
+  const calls = await mockApi(page, {
+    user: {
+      _id: 'user-worker',
+      username: 'worker',
+      email: 'worker@sania.test',
+      isActive: true,
+      role: { _id: 'role-worker', name: 'Worker', slug: 'worker' },
+      permissions: ['production_order.read', 'production_entry.read_own'],
+    },
+  });
+  await signInAsAdmin(page);
+
+  await page.goto('/invoices');
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+  expect(calls.some((call) => call.path.startsWith('/business/invoice'))).toBe(false);
+});
+
+test('invoice manager retains access to invoice and client workflows', async ({ page }) => {
+  await mockApi(page, {
+    user: {
+      _id: 'user-invoice',
+      username: 'invoice-manager',
+      email: 'invoice@sania.test',
+      isActive: true,
+      role: { _id: 'role-invoice', name: 'Invoice Manager', slug: 'invoice-manager' },
+      permissions: ['invoice.*', 'client.*'],
+    },
+  });
+  await signInAsAdmin(page);
+
+  await page.goto('/invoices');
+  await expect(page.getByRole('heading', { name: 'Invoice Manager' })).toBeVisible();
+  await page.goto('/clients');
+  await expect(page.getByRole('heading', { name: 'Client Manager' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Products' })).toHaveCount(0);
+});
+
 test('invoice view renders every business detail from the API response', async ({ page }) => {
   await mockApi(page);
   await signInAsAdmin(page);
@@ -88,7 +128,7 @@ test('invoice view renders every business detail from the API response', async (
   await page.goto('/invoices/invoice-1');
 
   const invoice = page.locator('#invoice-print');
-  await expect(invoice.getByText('Sania Clothing')).toBeVisible();
+  await expect(invoice.getByText('Sania Clothing', { exact: true })).toBeVisible();
   await expect(invoice.getByText('VAT No: VAT-123')).toBeVisible();
   await expect(invoice.getByText('CK No: CK-456')).toBeVisible();
   await expect(invoice.getByText('Cape Town, South Africa')).toBeVisible();
@@ -147,7 +187,7 @@ test('password manager calls the corrected update/password endpoint', async ({ p
 
   await page.goto('/password');
   await page.getByLabel('Current Password').fill('OldPassword123');
-  await page.getByLabel('New Password').fill('NewPassword123');
+  await page.getByLabel('New Password', { exact: true }).fill('NewPassword123');
   await page.getByLabel('Confirm New Password').fill('NewPassword123');
   await page.getByRole('button', { name: /Update Password/i }).click();
 
@@ -171,9 +211,15 @@ test('client manager can open the add-client flow and submit a client', async ({
   await signInAsAdmin(page);
 
   await page.goto('/clients');
-  await page.getByRole('button', { name: /Add Client/i }).first().click();
+  await page
+    .getByRole('button', { name: /Add Client/i })
+    .first()
+    .click();
   await page.getByPlaceholder('Ahmed Enterprises').fill('New Fashion Buyer');
-  await page.getByRole('dialog').getByRole('button', { name: /Add Client/i }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /Add Client/i })
+    .click();
 
   expect(calls).toContainEqual(
     expect.objectContaining({

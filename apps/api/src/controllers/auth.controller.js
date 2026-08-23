@@ -5,6 +5,31 @@ const nodemailer = require('nodemailer');
 const User = require('../models/user.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { generateToken, clearToken } = require('../services/token.service');
+const { getDefaultRegistrationRole } = require('../services/rbac.service');
+const { getPermissionKeys } = require('../services/permission.service');
+const { validatePermanentPassword } = require('../services/password.service');
+
+const populateAccess = (query) =>
+  query.populate({ path: 'role', populate: { path: 'permissions' } });
+
+const serializeUser = (user) => ({
+  _id: user._id,
+  username: user.username,
+  email: user.email,
+  phone: user.phone,
+  aboutMe: user.aboutMe,
+  avatar: user.avatar,
+  isActive: user.isActive !== false,
+  mustChangePassword: user.mustChangePassword === true,
+  role: user.role
+    ? {
+        _id: user.role._id,
+        name: user.role.name,
+        slug: user.role.slug,
+      }
+    : null,
+  permissions: getPermissionKeys(user),
+});
 
 const uploadToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
@@ -15,38 +40,38 @@ const uploadToCloudinary = (buffer) =>
     streamifier.createReadStream(buffer).pipe(stream);
   });
 
+const sendEmail = async (option) => {
+  const smtpMail = process.env.SMTP_MAIL || process.env.SMTP_USER;
+  const smtpPassword = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
 
- const sendEmail = async(option) =>{
-    const smtpMail = process.env.SMTP_MAIL || process.env.SMTP_USER;
-    const smtpPassword = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
+  if (!process.env.SMTP_HOST || !smtpMail || !smtpPassword) {
+    throw new Error('SMTP is not configured on the server');
+  }
 
-    if (!process.env.SMTP_HOST || !smtpMail || !smtpPassword) {
-      throw new Error('SMTP is not configured on the server');
-    }
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: Number(process.env.SMTP_PORT) === 465,
+    service: process.env.SMTP_SERVICE,
+    auth: {
+      user: smtpMail,
+      pass: smtpPassword,
+    },
+  });
 
-    const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: Number(process.env.SMTP_PORT) === 465,
-        service: process.env.SMTP_SERVICE,
-        auth: {
-            user: smtpMail,
-            pass: smtpPassword,
-        }
-    });
+  const mailOptions = {
+    from: process.env.SMTP_FROM || smtpMail,
+    to: option.email,
+    subject: option.subject,
+    text: option.text,
+  };
 
-    const mailOptions = {
-        from: process.env.SMTP_FROM || smtpMail,
-        to: option.email,
-        subject: option.subject,
-        text: option.text,
-    }
-
-    await transporter.sendMail(mailOptions);
-}
+  await transporter.sendMail(mailOptions);
+};
 
 exports.register = asyncHandler(async (req, res) => {
   const { username, email, phone, password, aboutMe } = req.body;
+  const defaultRole = await getDefaultRegistrationRole();
 
   let avatar = { public_id: '', url: '' };
 
@@ -55,7 +80,17 @@ exports.register = asyncHandler(async (req, res) => {
     avatar = { public_id: result.public_id, url: result.secure_url };
   }
 
-  const user = await User.create({ username, email, phone, password, aboutMe, avatar });
+  const user = await User.create({
+    username,
+    email,
+    phone,
+    password,
+    aboutMe,
+    avatar,
+    role: defaultRole?._id || null,
+  });
+
+  await user.populate({ path: 'role', populate: { path: 'permissions' } });
 
   const token = generateToken(user, res);
 
@@ -63,14 +98,7 @@ exports.register = asyncHandler(async (req, res) => {
     success: true,
     message: 'user Registered!',
     token,
-    user: {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      aboutMe: user.aboutMe,
-      avatar: user.avatar,
-    },
+    user: serializeUser(user),
   });
 });
 
@@ -81,12 +109,19 @@ exports.login = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email & Password Are Required!' });
   }
 
-  const user = await User.findOne({ email }).select('+password');
+  const user = await populateAccess(User.findOne({ email }).select('+password'));
 
   // TODO: remove after diagnosing login failure — do NOT leave in production
   if (!user) {
-  
     return res.status(401).json({ success: false, message: 'Invalid Email Or Password!' });
+  }
+
+  if (user.isActive === false) {
+    return res.status(403).json({ success: false, message: 'User account is inactive' });
+  }
+
+  if (user.role?.isActive === false) {
+    return res.status(403).json({ success: false, message: 'Assigned role is inactive' });
   }
 
   const passwordMatch = await user.comparePassword(password);
@@ -101,14 +136,7 @@ exports.login = asyncHandler(async (req, res) => {
     success: true,
     message: 'LoggedIn',
     token,
-    user: {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      aboutMe: user.aboutMe,
-      avatar: user.avatar,
-    },
+    user: serializeUser(user),
   });
 });
 
@@ -120,20 +148,13 @@ exports.logout = asyncHandler(async (req, res) => {
 exports.getUser = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
-    user: {
-      _id: req.user._id,
-      username: req.user.username,
-      email: req.user.email,
-      phone: req.user.phone,
-      aboutMe: req.user.aboutMe,
-      avatar: req.user.avatar,
-    },
+    user: serializeUser(req.user),
   });
 });
 
 exports.updateProfile = asyncHandler(async (req, res) => {
   const { username, email, phone, aboutMe } = req.body;
-  const user = await User.findById(req.user._id);
+  const user = await populateAccess(User.findById(req.user._id));
 
   if (username) user.username = username;
   if (email) user.email = email;
@@ -153,14 +174,7 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Profile Updated',
-    updatedUser: {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      aboutMe: user.aboutMe,
-      avatar: user.avatar,
-    },
+    updatedUser: serializeUser(user),
   });
 });
 
@@ -184,7 +198,20 @@ exports.updatePassword = asyncHandler(async (req, res) => {
     });
   }
 
+  const passwordValidationError = validatePermanentPassword(newPassword);
+  if (passwordValidationError) {
+    return res.status(400).json({ success: false, message: passwordValidationError });
+  }
+
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'New password must be different from the current password',
+    });
+  }
+
   user.password = newPassword;
+  user.mustChangePassword = false;
   await user.save();
 
   res.status(200).json({ success: true, message: 'Password Updated!' });
@@ -205,8 +232,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
   const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
-    const message = `Your Reset Password Token is : \n \n ${resetUrl} \n \n If You'r Not Request For This Please Ignore It.`;
-
+  const message = `Your Reset Password Token is : \n \n ${resetUrl} \n \n If You'r Not Request For This Please Ignore It.`;
 
   try {
     await sendEmail({
@@ -253,7 +279,13 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     });
   }
 
+  const passwordValidationError = validatePermanentPassword(password);
+  if (passwordValidationError) {
+    return res.status(400).json({ success: false, message: passwordValidationError });
+  }
+
   user.password = password;
+  user.mustChangePassword = false;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpire = undefined;
   await user.save();

@@ -12,6 +12,8 @@ const clientRoutes = require('./routes/client.routes');
 const invoiceRoutes = require('./routes/invoice.routes');
 const bankAccountRoutes = require('./routes/bankAccount.routes');
 const productRoutes = require('./routes/product.routes');
+const roleRoutes = require('./routes/role.routes');
+const userManagementRoutes = require('./routes/userManagement.routes');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -20,10 +22,10 @@ cloudinary.config({
 });
 
 const app = express();
-app.set("trust proxy", 1);
+app.set('trust proxy', 1);
 
-const allowedOrigins = (process.env.FRONTEND_URL || "")
-  .split(",")
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
@@ -35,7 +37,7 @@ app.use(
         return;
       }
 
-      callback(new Error("Not allowed by CORS"));
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
   })
@@ -45,16 +47,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.get("/healthz", (req, res) => {
-  res.status(200).json({ success: true, status: "ok" });
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ success: true, status: 'ok' });
 });
 
-app.use("/api/v1/user", authRoutes);
-app.use("/api/v1/business/invoice", invoiceRoutes);
-app.use("/api/v1/business", businessRoutes);
-app.use("/api/v1/client", clientRoutes);
-app.use("/api/v1/bankAccount", bankAccountRoutes);
-app.use("/api/v1/product", productRoutes);
+app.use('/api/v1/user', authRoutes);
+app.use('/api/v1/business/invoice', invoiceRoutes);
+app.use('/api/v1/business', businessRoutes);
+app.use('/api/v1/client', clientRoutes);
+app.use('/api/v1/bankAccount', bankAccountRoutes);
+app.use('/api/v1/product', productRoutes);
+app.use('/api/v1/roles', roleRoutes);
+app.use('/api/v1/users', userManagementRoutes);
 
 app.use(errorHandler);
 

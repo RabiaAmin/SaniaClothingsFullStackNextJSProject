@@ -19,6 +19,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import { Button } from '@/components/ui/button';
 import { FileText, Users, DollarSign, TrendingUp, AlertCircle, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function normalizeList(data, key) {
@@ -70,12 +71,17 @@ function StatusBar({ label, count, total, colorClass }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const { user, hasPermission } = useAuth();
+  const canReadInvoices = hasPermission('invoice.read');
+  const canReadClients = hasPermission('client.read');
   const {
     data: invoicesRaw,
     isLoading: loadingInv,
     error: errInv,
-  } = useFetch(() => invoiceApi.getAllInvoices());
-  const { data: clientsRaw, isLoading: loadingCli } = useFetch(() => clientApi.getAllClients());
+  } = useFetch(() => invoiceApi.getAllInvoices(), { immediate: canReadInvoices });
+  const { data: clientsRaw, isLoading: loadingCli } = useFetch(() => clientApi.getAllClients(), {
+    immediate: canReadClients,
+  });
 
   const invoices = normalizeList(invoicesRaw, 'invoices');
   const clients = normalizeList(clientsRaw, 'clients');
@@ -95,7 +101,24 @@ export default function DashboardPage() {
 
   const clientMap = Object.fromEntries(clients.map((c) => [c._id, c.name]));
 
-  const isLoading = loadingInv || loadingCli;
+  const isLoading = (canReadInvoices && loadingInv) || (canReadClients && loadingCli);
+
+  if (!canReadInvoices) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Dashboard" description="Your Sania Clothing workspace" />
+        <Card>
+          <CardContent className="py-10 text-center">
+            <h2 className="text-lg font-semibold">Welcome, {user?.username ?? 'User'}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your {user?.role?.name ?? 'assigned'} role is active. Available tools are shown in the
+              sidebar.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

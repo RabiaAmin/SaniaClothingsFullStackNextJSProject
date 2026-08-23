@@ -9,11 +9,11 @@ test('public pages render without application errors', async ({ page }) => {
   const routes = [
     ['/', /Crafted\s+with Precision/i],
     ['/about', /Sania Clothing/i],
-    ['/services', /Services/i],
+    ['/services', /Garment Manufacturing Services/i],
     ['/catalogue', /Product Catalogue/i],
     ['/products', /Product Catalogue/i],
     ['/products/prod-1', /Denim Work Jacket/i],
-    ['/contact', /Get in Touch/i],
+    ['/contact', /Send a Message/i],
     ['/login', /Welcome back/i],
     ['/register', /Create an account/i],
     ['/forgot-password', /Forgot your password/i],

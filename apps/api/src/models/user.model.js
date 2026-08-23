@@ -37,12 +37,25 @@ const userSchema = new mongoose.Schema({
   avatar: {
     public_id: {
       type: String,
-      required: true,
+      default: '',
     },
     url: {
       type: String,
-      required: true,
+      default: '',
     },
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    default: null,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  mustChangePassword: {
+    type: Boolean,
+    default: false,
   },
   resetPasswordToken: String,
   resetPasswordExpire: Date,

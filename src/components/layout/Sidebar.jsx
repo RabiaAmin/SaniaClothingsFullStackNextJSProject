@@ -12,6 +12,8 @@ import {
   Building2,
   CreditCard,
   KeyRound,
+  ShieldCheck,
+  UserCog,
   Package,
   LogOut,
   Loader2,
@@ -22,18 +24,25 @@ import { useState } from 'react';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/invoices', label: 'Invoice Manager', icon: FileText },
-  { href: '/clients', label: 'Client Manager', icon: Users },
-  { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/business', label: 'Business Profile', icon: Building2 },
-  { href: '/bank-accounts', label: 'Bank Accounts', icon: CreditCard },
+  { href: '/invoices', label: 'Invoice Manager', icon: FileText, permission: 'invoice.read' },
+  { href: '/clients', label: 'Client Manager', icon: Users, permission: 'client.read' },
+  { href: '/admin/products', label: 'Products', icon: Package, permission: 'product.read' },
+  { href: '/business', label: 'Business Profile', icon: Building2, permission: 'business.read' },
+  {
+    href: '/bank-accounts',
+    label: 'Bank Accounts',
+    icon: CreditCard,
+    permission: 'bank_account.read',
+  },
+  { href: '/users', label: 'User Access', icon: UserCog, permission: 'user.read' },
+  { href: '/roles', label: 'Roles & Permissions', icon: ShieldCheck, permission: 'role.read' },
   { href: '/password', label: 'Password Manager', icon: KeyRound },
 ];
 
 export default function Sidebar({ open = false, onClose }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, user } = useAuth();
+  const { logout, user, hasPermission } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -87,28 +96,30 @@ export default function Sidebar({ open = false, onClose }) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                active
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-              {active && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60" />
-              )}
-            </Link>
-          );
-        })}
+        {NAV_ITEMS.filter(({ permission }) => !permission || hasPermission(permission)).map(
+          ({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onClose}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                  active
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+                {active && (
+                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60" />
+                )}
+              </Link>
+            );
+          }
+        )}
       </nav>
 
       {/* User section */}

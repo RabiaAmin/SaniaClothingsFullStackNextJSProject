@@ -4,6 +4,7 @@ import { useState } from 'react';
 import AuthGuard from '@/components/auth/AuthGuard';
 import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
+import PermissionRouteGuard from '@/components/auth/PermissionRouteGuard';
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,7 +26,9 @@ export default function AdminLayout({ children }) {
         <div className="flex flex-1 flex-col overflow-hidden">
           <Navbar onMenuClick={() => setSidebarOpen((v) => !v)} />
           <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">{children}</div>
+            <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
+              <PermissionRouteGuard>{children}</PermissionRouteGuard>
+            </div>
           </main>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isProtectedPath } from '@/lib/auth/access';
 
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'token';
 
@@ -14,28 +15,14 @@ const STATIC_PUBLIC_PATHS = new Set([
   '/reset-password',
 ]);
 
-const ADMIN_PATHS = [
-  '/admin',
-  '/dashboard',
-  '/invoices',
-  '/clients',
-  '/business',
-  '/bank-accounts',
-  '/password',
-];
-
 function isPublicPath(pathname) {
   return STATIC_PUBLIC_PATHS.has(pathname) || pathname.startsWith('/products/');
-}
-
-function isAdminPath(pathname) {
-  return ADMIN_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (isPublicPath(pathname) || !isAdminPath(pathname)) {
+  if (isPublicPath(pathname) || !isProtectedPath(pathname)) {
     return NextResponse.next();
   }
 

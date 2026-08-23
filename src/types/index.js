@@ -6,12 +6,34 @@
 
 /**
  * @typedef {Object} User
- * @property {string}   id
- * @property {string}   firstName
- * @property {string}   lastName
+ * @property {string}   _id
+ * @property {string}   username
  * @property {string}   email
- * @property {'admin'|'user'} role
- * @property {string}   createdAt
+ * @property {string}   phone
+ * @property {boolean}  isActive
+ * @property {boolean}  mustChangePassword
+ * @property {Role|null} role
+ * @property {string[]} permissions
+ */
+
+/**
+ * @typedef {Object} Role
+ * @property {string}       _id
+ * @property {string}       name
+ * @property {string}       slug
+ * @property {string}       description
+ * @property {Permission[]} permissions
+ * @property {boolean}      isSystem
+ */
+
+/**
+ * @typedef {Object} Permission
+ * @property {string}  _id
+ * @property {string}  key
+ * @property {string}  resource
+ * @property {string}  action
+ * @property {string}  description
+ * @property {boolean} isSystem
  */
 
 /**

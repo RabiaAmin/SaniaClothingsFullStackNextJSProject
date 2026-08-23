@@ -1,18 +1,5 @@
 import axios from 'axios';
-
-const PROTECTED_PATHS = [
-  '/admin',
-  '/dashboard',
-  '/invoices',
-  '/clients',
-  '/business',
-  '/bank-accounts',
-  '/password',
-];
-
-function isProtectedPath(pathname) {
-  return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-}
+import { isProtectedPath } from '@/lib/auth/access';
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -33,6 +20,7 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+    const code = error.response?.data?.code;
 
     if (
       status === 401 &&
@@ -42,8 +30,20 @@ axiosInstance.interceptors.response.use(
       window.location.href = '/login';
     }
 
+    if (
+      status === 403 &&
+      code === 'PASSWORD_CHANGE_REQUIRED' &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/change-password'
+    ) {
+      window.location.href = '/change-password';
+    }
+
     const message = error.response?.data?.message ?? error.message;
-    return Promise.reject(new Error(message));
+    const apiError = new Error(message);
+    apiError.status = status;
+    apiError.code = code;
+    return Promise.reject(apiError);
   }
 );
 

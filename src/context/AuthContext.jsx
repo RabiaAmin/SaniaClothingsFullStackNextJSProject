@@ -1,24 +1,15 @@
 'use client';
 
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import authApi from '@/lib/api/auth.api';
+import { isProtectedPath } from '@/lib/auth/access';
+import {
+  hasPermission as userHasPermission,
+  hasAnyPermission as userHasAnyPermission,
+} from '@/lib/auth/permissions';
 
 export const AuthContext = createContext(null);
-
-const PROTECTED_PATHS = [
-  '/admin',
-  '/dashboard',
-  '/invoices',
-  '/clients',
-  '/business',
-  '/bank-accounts',
-  '/password',
-];
-
-function isProtectedPath(pathname) {
-  return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-}
 
 export function AuthProvider({ children }) {
   const pathname = usePathname();
@@ -50,7 +41,9 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     const res = await authApi.login(credentials);
-    setUser(res.data?.user ?? res.data);
+    const authenticatedUser = res.data?.user ?? res.data;
+    setUser(authenticatedUser);
+    return authenticatedUser;
   }, []);
 
   const register = useCallback(async (payload) => {
@@ -63,6 +56,19 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const permissions = useMemo(
+    () => user?.permissions ?? user?.role?.permissions ?? [],
+    [user?.permissions, user?.role?.permissions]
+  );
+  const hasPermission = useCallback(
+    (permission) => userHasPermission(permissions, permission),
+    [permissions]
+  );
+  const hasAnyPermission = useCallback(
+    (requiredPermissions) => userHasAnyPermission(permissions, requiredPermissions),
+    [permissions]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -73,6 +79,9 @@ export function AuthProvider({ children }) {
         register,
         logout,
         setUser,
+        permissions,
+        hasPermission,
+        hasAnyPermission,
       }}
     >
       {children}

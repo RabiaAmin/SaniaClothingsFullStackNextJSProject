@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { PageSpinner } from '@/components/common/LoadingSpinner';
 
@@ -15,14 +15,33 @@ import { PageSpinner } from '@/components/common/LoadingSpinner';
  * Once resolved, unauthenticated users are redirected to /login.
  */
 export default function AuthGuard({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/login');
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      user?.mustChangePassword &&
+      pathname !== '/change-password'
+    ) {
+      router.replace('/change-password');
+      return;
+    }
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      !user?.mustChangePassword &&
+      pathname === '/change-password'
+    ) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, pathname, router, user?.mustChangePassword]);
 
   // Still fetching the current user
   if (isLoading) {
@@ -31,6 +50,13 @@ export default function AuthGuard({ children }) {
 
   // Not authenticated — render nothing while the redirect fires
   if (!isAuthenticated) {
+    return null;
+  }
+
+  if (
+    (user?.mustChangePassword && pathname !== '/change-password') ||
+    (!user?.mustChangePassword && pathname === '/change-password')
+  ) {
     return null;
   }
 
