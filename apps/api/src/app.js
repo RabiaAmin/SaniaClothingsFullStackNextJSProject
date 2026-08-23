@@ -14,6 +14,9 @@ const bankAccountRoutes = require('./routes/bankAccount.routes');
 const productRoutes = require('./routes/product.routes');
 const roleRoutes = require('./routes/role.routes');
 const userManagementRoutes = require('./routes/userManagement.routes');
+const productionOrderRoutes = require('./routes/productionOrder.routes');
+const productionEntryRoutes = require('./routes/productionEntry.routes');
+const payrollRoutes = require('./routes/payroll.routes');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -59,6 +62,9 @@ app.use('/api/v1/bankAccount', bankAccountRoutes);
 app.use('/api/v1/product', productRoutes);
 app.use('/api/v1/roles', roleRoutes);
 app.use('/api/v1/users', userManagementRoutes);
+app.use('/api/v1/production-orders', productionOrderRoutes);
+app.use('/api/v1/production-entries', productionEntryRoutes);
+app.use('/api/v1/payroll', payrollRoutes);
 
 app.use(errorHandler);
 

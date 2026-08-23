@@ -10,10 +10,14 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export default function PermissionRouteGuard({ children }) {
   const pathname = usePathname();
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasAnyPermission } = useAuth();
   const requiredPermission = requiredPermissionForPath(pathname);
 
-  if (!requiredPermission || hasPermission(requiredPermission)) return children;
+  const allowed = Array.isArray(requiredPermission)
+    ? hasAnyPermission(requiredPermission)
+    : hasPermission(requiredPermission);
+
+  if (!requiredPermission || allowed) return children;
 
   return (
     <Card className="mx-auto mt-12 max-w-lg">

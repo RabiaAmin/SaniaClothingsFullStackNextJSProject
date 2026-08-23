@@ -140,6 +140,20 @@ const permissions = [
     action: 'read_own',
     description: 'View own entries',
   },
+  {
+    _id: 'permission-payroll-own',
+    key: 'payroll.read_own',
+    resource: 'payroll',
+    action: 'read_own',
+    description: 'View own monthly earnings',
+  },
+  {
+    _id: 'permission-payroll-all',
+    key: 'payroll.read_all',
+    resource: 'payroll',
+    action: 'read_all',
+    description: 'View all monthly payroll',
+  },
 ];
 
 const roles = [
@@ -161,7 +175,7 @@ const roles = [
     isSystem: true,
     isActive: true,
     assignedUserCount: 0,
-    permissions: [permissions[3]],
+    permissions: [permissions[3], permissions[4]],
   },
   {
     _id: 'role-invoice',
@@ -184,6 +198,40 @@ const roles = [
     permissions: [],
   },
 ];
+
+const productionOrder = {
+  _id: 'production-order-1',
+  poNumber: 'PO-2026-001',
+  client: { _id: 'client-1', name: 'Acme Retail', email: 'buyer@acme.test' },
+  product: { _id: 'prod-1', name: 'Denim Work Jacket', category: 'Jackets' },
+  productionDescription: 'Navy work jackets for winter delivery',
+  orderedQuantity: 120,
+  approvedQuantity: 80,
+  producedQuantity: 80,
+  remainingQuantity: 40,
+  progressPercentage: 67,
+  workerRate: 12.5,
+  startDate: '2026-08-01T00:00:00.000Z',
+  dueDate: '2026-08-31T00:00:00.000Z',
+  status: 'IN_PROGRESS',
+  notes: 'Use reinforced navy stitching.',
+  createdBy: { _id: 'user-1', username: 'admin', email: 'admin@sania.test' },
+  updatedBy: { _id: 'user-1', username: 'admin', email: 'admin@sania.test' },
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-20T00:00:00.000Z',
+};
+
+const worker = {
+  _id: 'user-worker',
+  username: 'worker',
+  email: 'worker@sania.test',
+};
+
+const secondWorker = {
+  _id: 'user-worker-2',
+  username: 'worker-two',
+  email: 'worker2@sania.test',
+};
 
 function response(route, body, status = 200, headers = {}) {
   return route.fulfill({
@@ -212,6 +260,37 @@ async function mockApi(page, options = {}) {
   let createdUser = null;
   let createdUserPassword = null;
   const managedUsers = [currentUser];
+  let currentApprovedQuantity = productionOrder.approvedQuantity;
+  const productionEntries = [
+    {
+      _id: 'production-entry-pending',
+      productionOrder: { ...productionOrder },
+      worker,
+      date: '2026-08-20T00:00:00.000Z',
+      quantity: options.productionEntryQuantity ?? 30,
+      unitRate: 12.5,
+      totalAmount: (options.productionEntryQuantity ?? 30) * 12.5,
+      notes: 'Morning production run',
+      status: 'PENDING',
+      reviewedBy: null,
+      reviewedAt: null,
+      reviewNotes: '',
+    },
+    {
+      _id: 'production-entry-approved',
+      productionOrder: { ...productionOrder },
+      worker: secondWorker,
+      date: '2026-08-19T00:00:00.000Z',
+      quantity: 80,
+      unitRate: 12.5,
+      totalAmount: 1000,
+      notes: '',
+      status: 'APPROVED',
+      reviewedBy: user,
+      reviewedAt: '2026-08-20T00:00:00.000Z',
+      reviewNotes: 'Count verified',
+    },
+  ];
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
@@ -223,7 +302,12 @@ async function mockApi(page, options = {}) {
       return route.fulfill({ status: 204 });
     }
 
-    calls.push({ method, path, payload: method === 'GET' ? null : await readPayload(route) });
+    calls.push({
+      method,
+      path,
+      query: Object.fromEntries(url.searchParams.entries()),
+      payload: method === 'GET' ? null : await readPayload(route),
+    });
 
     if (method === 'GET' && path === '/user/getUser') {
       return response(route, { success: true, user: sessionUser });
@@ -309,7 +393,7 @@ async function mockApi(page, options = {}) {
         isActive: true,
         mustChangePassword: true,
         role: { _id: role._id, name: role.name, slug: role.slug },
-        permissions: ['production_order.read', 'production_entry.read_own'],
+        permissions: ['production_order.read', 'production_entry.read_own', 'payroll.read_own'],
       };
       managedUsers.push(createdUser);
       return response(
@@ -320,6 +404,207 @@ async function mockApi(page, options = {}) {
     }
     if (method === 'PUT' && path.startsWith('/users/')) {
       return response(route, { success: true, user: currentUser });
+    }
+
+    if (method === 'GET' && path === '/production-orders') {
+      return response(route, {
+        success: true,
+        productionOrders: [{ ...productionOrder, approvedQuantity: currentApprovedQuantity }],
+        page: 1,
+        totalPages: 1,
+        totalRecords: 1,
+      });
+    }
+    if (method === 'POST' && path === '/production-orders') {
+      const payload = await readPayload(route);
+      return response(
+        route,
+        {
+          success: true,
+          productionOrder: { ...productionOrder, ...payload, _id: 'production-order-created' },
+        },
+        201
+      );
+    }
+    if (method === 'GET' && path.startsWith('/production-orders/')) {
+      return response(route, {
+        success: true,
+        productionOrder,
+        matchingInvoices: [
+          {
+            _id: 'invoice-1',
+            invoiceNumber: '1001',
+            poNumber: productionOrder.poNumber,
+            status: 'Paid',
+          },
+        ],
+      });
+    }
+    if (method === 'PUT' && path.startsWith('/production-orders/')) {
+      return response(route, { success: true, productionOrder });
+    }
+    if (method === 'PATCH' && path.endsWith('/status')) {
+      const payload = await readPayload(route);
+      return response(route, {
+        success: true,
+        productionOrder: { ...productionOrder, status: payload.status },
+      });
+    }
+    if (method === 'DELETE' && path.startsWith('/production-orders/')) {
+      return response(route, { success: true });
+    }
+
+    if (method === 'GET' && path === '/production-entries') {
+      const canReadAll =
+        sessionUser.permissions?.includes('*') ||
+        sessionUser.permissions?.includes('production_entry.read_all');
+      let visibleEntries = canReadAll
+        ? productionEntries
+        : productionEntries.filter((entry) => entry.worker._id === sessionUser._id);
+      const requestedStatus = url.searchParams.get('status');
+      if (requestedStatus) {
+        visibleEntries = visibleEntries.filter((entry) => entry.status === requestedStatus);
+      }
+      return response(route, {
+        success: true,
+        productionEntries: visibleEntries,
+        stats: {
+          pendingEntries: visibleEntries.filter((entry) => entry.status === 'PENDING').length,
+          approvedQuantity: visibleEntries
+            .filter((entry) => entry.status === 'APPROVED')
+            .reduce((total, entry) => total + entry.quantity, 0),
+          approvedAmount: visibleEntries
+            .filter((entry) => entry.status === 'APPROVED')
+            .reduce((total, entry) => total + entry.totalAmount, 0),
+        },
+        page: 1,
+        totalPages: 1,
+        totalRecords: visibleEntries.length,
+      });
+    }
+    if (method === 'POST' && path === '/production-entries') {
+      const payload = await readPayload(route);
+      const entry = {
+        _id: 'production-entry-created',
+        productionOrder: { ...productionOrder },
+        worker: {
+          _id: sessionUser._id,
+          username: sessionUser.username,
+          email: sessionUser.email,
+        },
+        date: payload.date,
+        quantity: payload.quantity,
+        unitRate: productionOrder.workerRate,
+        totalAmount: payload.quantity * productionOrder.workerRate,
+        notes: payload.notes ?? '',
+        status: 'PENDING',
+      };
+      productionEntries.unshift(entry);
+      return response(route, { success: true, productionEntry: entry }, 201);
+    }
+    if (method === 'PUT' && path.startsWith('/production-entries/')) {
+      const entry = productionEntries.find((item) => path.endsWith(item._id));
+      const payload = await readPayload(route);
+      Object.assign(entry, payload, {
+        totalAmount: (payload.quantity ?? entry.quantity) * entry.unitRate,
+      });
+      return response(route, { success: true, productionEntry: entry });
+    }
+    if (
+      method === 'PATCH' &&
+      (path.endsWith('/approve') || path.endsWith('/reject')) &&
+      path.startsWith('/production-entries/')
+    ) {
+      const entryId = path.split('/')[2];
+      const entry = productionEntries.find((item) => item._id === entryId);
+      const approving = path.endsWith('/approve');
+      if (approving && currentApprovedQuantity + entry.quantity > productionOrder.orderedQuantity) {
+        return response(
+          route,
+          {
+            success: false,
+            message: 'This entry exceeds the remaining quantity or the production order is closed',
+          },
+          409
+        );
+      }
+      if (approving) currentApprovedQuantity += entry.quantity;
+      entry.status = approving ? 'APPROVED' : 'REJECTED';
+      entry.reviewedBy = user;
+      entry.reviewedAt = new Date().toISOString();
+      return response(route, { success: true, productionEntry: entry });
+    }
+
+    if (method === 'GET' && path === '/payroll/monthly') {
+      const payrollWorkers = [
+        {
+          worker,
+          totalApprovedPieces: 40,
+          totalEarnings: 600,
+          entryCount: 1,
+          entries: [
+            {
+              productionEntryId: 'payroll-entry-1',
+              date: '2026-08-10T00:00:00.000Z',
+              productionOrderId: 'production-order-1',
+              poNumber: 'PO-1001',
+              product: { _id: 'prod-1', name: 'Denim Work Jacket' },
+              productionDescription: 'Navy work jackets',
+              quantity: 40,
+              unitRate: 15,
+              amount: 600,
+            },
+          ],
+        },
+        {
+          worker: secondWorker,
+          totalApprovedPieces: 100,
+          totalEarnings: 1200,
+          entryCount: 1,
+          entries: [
+            {
+              productionEntryId: 'payroll-entry-2',
+              date: '2026-08-11T00:00:00.000Z',
+              productionOrderId: 'production-order-2',
+              poNumber: 'PO-1002',
+              product: null,
+              productionDescription: 'Cotton utility shirts',
+              quantity: 100,
+              unitRate: 12,
+              amount: 1200,
+            },
+          ],
+        },
+      ];
+      const canReadAll =
+        sessionUser.permissions?.includes('*') ||
+        sessionUser.permissions?.includes('payroll.read_all');
+      const requestedWorker = canReadAll ? url.searchParams.get('workerId') : sessionUser._id;
+      const visibleWorkers = requestedWorker
+        ? payrollWorkers.filter((item) => item.worker._id === requestedWorker)
+        : payrollWorkers;
+      return response(route, {
+        success: true,
+        scope: canReadAll ? (requestedWorker ? 'worker' : 'all') : 'own',
+        report: {
+          period: {
+            year: Number(url.searchParams.get('year')),
+            month: Number(url.searchParams.get('month')),
+            start: '2026-08-01T00:00:00.000Z',
+            end: '2026-09-01T00:00:00.000Z',
+          },
+          summary: {
+            workerCount: visibleWorkers.length,
+            entryCount: visibleWorkers.reduce((total, item) => total + item.entryCount, 0),
+            totalApprovedPieces: visibleWorkers.reduce(
+              (total, item) => total + item.totalApprovedPieces,
+              0
+            ),
+            totalEarnings: visibleWorkers.reduce((total, item) => total + item.totalEarnings, 0),
+          },
+          workers: visibleWorkers,
+        },
+      });
     }
 
     if (method === 'GET' && path === '/business/get') {

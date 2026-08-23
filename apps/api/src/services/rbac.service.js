@@ -25,6 +25,8 @@ const PERMISSIONS = [
   ],
   ['production_entry.approve', 'production_entry', 'approve', 'Approve production entries'],
   ['production_entry.reject', 'production_entry', 'reject', 'Reject production entries'],
+  ['payroll.read_own', 'payroll', 'read_own', 'View own monthly earnings'],
+  ['payroll.read_all', 'payroll', 'read_all', 'View all worker payroll reports'],
   ['invoice.*', 'invoice', '*', 'Manage invoices and statements'],
   ['client.*', 'client', '*', 'Manage clients'],
   ['product.*', 'product', '*', 'Manage catalogue products'],
@@ -55,6 +57,7 @@ const ROLE_DEFINITIONS = [
       'production_entry.update_all',
       'production_entry.approve',
       'production_entry.reject',
+      'payroll.read_all',
       'client.*',
       'product.*',
     ],
@@ -68,6 +71,7 @@ const ROLE_DEFINITIONS = [
       'production_entry.create',
       'production_entry.read_own',
       'production_entry.update_own',
+      'payroll.read_own',
     ],
   },
   {
@@ -87,6 +91,10 @@ async function upsertPermission([key, resource, action, description]) {
 }
 
 async function initializeRbac() {
+  const payrollKeys = ['payroll.read_own', 'payroll.read_all'];
+  const existingPayrollKeys = new Set(
+    await Permission.find({ key: { $in: payrollKeys } }).distinct('key')
+  );
   const permissions = await Promise.all(PERMISSIONS.map(upsertPermission));
   const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission]));
 
@@ -118,6 +126,20 @@ async function initializeRbac() {
     { $set: { permissions: [fullAccessPermission._id], isSystem: true, isActive: true } },
     { new: true }
   );
+
+  const initialPayrollGrants = [
+    ['production-manager', 'payroll.read_all'],
+    ['worker', 'payroll.read_own'],
+  ];
+  for (const [slug, permissionKey] of initialPayrollGrants) {
+    if (!existingPayrollKeys.has(permissionKey)) {
+      roles[slug] = await Role.findOneAndUpdate(
+        { slug },
+        { $addToSet: { permissions: permissionByKey.get(permissionKey)._id } },
+        { new: true }
+      );
+    }
+  }
 
   const migration = await User.updateMany(
     { $or: [{ role: { $exists: false } }, { role: null }] },

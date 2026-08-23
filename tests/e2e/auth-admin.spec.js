@@ -65,6 +65,9 @@ test('signed-in admin feature pages render with mocked data', async ({ page }) =
   const routes = [
     ['/dashboard', 'Dashboard'],
     ['/invoices', 'Invoice Manager'],
+    ['/production-orders', 'Production Orders'],
+    ['/production-entries', 'Production Entries'],
+    ['/payroll', 'Monthly Payroll'],
     ['/invoices/create', 'Create Invoice'],
     ['/invoices/statements', 'Invoice Statements'],
     ['/clients', 'Client Manager'],

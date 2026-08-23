@@ -9,11 +9,12 @@ export const CLIENT_KEYS = {
   detail: (id) => ['clients', 'detail', id],
 };
 
-export function useClients() {
+export function useClients(options = {}) {
   return useQuery({
     queryKey: CLIENT_KEYS.list(),
     queryFn: () => clientApi.getAllClients().then((r) => r.data),
     staleTime: 60_000,
+    enabled: options.enabled ?? true,
   });
 }
 

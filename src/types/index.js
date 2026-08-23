@@ -5,6 +5,35 @@
  */
 
 /**
+ * @typedef {Object} PayrollAuditEntry
+ * @property {string} productionEntryId
+ * @property {string} date
+ * @property {string|null} productionOrderId
+ * @property {string} poNumber
+ * @property {Object|null} product
+ * @property {string} productionDescription
+ * @property {number} quantity
+ * @property {number} unitRate
+ * @property {number} amount
+ */
+
+/**
+ * @typedef {Object} ProductionEntry
+ * @property {string} _id
+ * @property {ProductionOrder|string} productionOrder
+ * @property {Object|string} worker
+ * @property {string} date
+ * @property {number} quantity
+ * @property {number} unitRate
+ * @property {number} totalAmount
+ * @property {'PENDING'|'APPROVED'|'REJECTED'} status
+ * @property {string} notes
+ * @property {Object|string|null} reviewedBy
+ * @property {string|null} reviewedAt
+ * @property {string} reviewNotes
+ */
+
+/**
  * @typedef {Object} User
  * @property {string}   _id
  * @property {string}   username
@@ -24,6 +53,25 @@
  * @property {string}       description
  * @property {Permission[]} permissions
  * @property {boolean}      isSystem
+ */
+
+/**
+ * @typedef {Object} ProductionOrder
+ * @property {string} _id
+ * @property {string} poNumber
+ * @property {Client} client
+ * @property {Object|null} product
+ * @property {string} productionDescription
+ * @property {number} orderedQuantity
+ * @property {number} approvedQuantity
+ * @property {number} producedQuantity
+ * @property {number} remainingQuantity
+ * @property {number} progressPercentage
+ * @property {number} workerRate
+ * @property {string} startDate
+ * @property {string} dueDate
+ * @property {'PENDING'|'IN_PROGRESS'|'COMPLETED'|'CANCELLED'} status
+ * @property {string} notes
  */
 
 /**

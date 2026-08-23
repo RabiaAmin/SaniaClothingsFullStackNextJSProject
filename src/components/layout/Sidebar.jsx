@@ -19,12 +19,33 @@ import {
   Loader2,
   X,
   Zap,
+  ClipboardList,
+  ClipboardCheck,
+  Banknote,
 } from 'lucide-react';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/invoices', label: 'Invoice Manager', icon: FileText, permission: 'invoice.read' },
+  {
+    href: '/production-orders',
+    label: 'Production Orders',
+    icon: ClipboardList,
+    permission: 'production_order.read',
+  },
+  {
+    href: '/production-entries',
+    label: 'Production Entries',
+    icon: ClipboardCheck,
+    anyPermission: ['production_entry.read_own', 'production_entry.read_all'],
+  },
+  {
+    href: '/payroll',
+    label: 'Earnings & Payroll',
+    icon: Banknote,
+    anyPermission: ['payroll.read_own', 'payroll.read_all'],
+  },
   { href: '/clients', label: 'Client Manager', icon: Users, permission: 'client.read' },
   { href: '/admin/products', label: 'Products', icon: Package, permission: 'product.read' },
   { href: '/business', label: 'Business Profile', icon: Building2, permission: 'business.read' },
@@ -96,30 +117,32 @@ export default function Sidebar({ open = false, onClose }) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {NAV_ITEMS.filter(({ permission }) => !permission || hasPermission(permission)).map(
-          ({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                  active
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-                {active && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60" />
-                )}
-              </Link>
-            );
-          }
-        )}
+        {NAV_ITEMS.filter(
+          ({ permission, anyPermission }) =>
+            (!permission || hasPermission(permission)) &&
+            (!anyPermission || anyPermission.some(hasPermission))
+        ).map(({ href, label, icon: Icon }) => {
+          const active = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onClose}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                active
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+              {active && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60" />
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* User section */}

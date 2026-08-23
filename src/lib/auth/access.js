@@ -2,6 +2,9 @@ export const PROTECTED_PATHS = [
   '/admin',
   '/dashboard',
   '/invoices',
+  '/production-orders',
+  '/production-entries',
+  '/payroll',
   '/clients',
   '/business',
   '/bank-accounts',
@@ -14,6 +17,14 @@ export const PROTECTED_PATHS = [
 export const ROUTE_PERMISSIONS = [
   { path: '/admin/products', permission: 'product.read' },
   { path: '/invoices', permission: 'invoice.read' },
+  { path: '/production-orders/create', permission: 'production_order.create' },
+  { match: /^\/production-orders\/[^/]+\/edit$/, permission: 'production_order.update' },
+  { path: '/production-orders', permission: 'production_order.read' },
+  {
+    path: '/production-entries',
+    permission: ['production_entry.read_own', 'production_entry.read_all'],
+  },
+  { path: '/payroll', permission: ['payroll.read_own', 'payroll.read_all'] },
   { path: '/clients', permission: 'client.read' },
   { path: '/business', permission: 'business.read' },
   { path: '/bank-accounts', permission: 'bank_account.read' },
@@ -30,5 +41,9 @@ export function isProtectedPath(pathname) {
 }
 
 export function requiredPermissionForPath(pathname) {
-  return ROUTE_PERMISSIONS.find(({ path }) => isPathMatch(pathname, path))?.permission ?? null;
+  return (
+    ROUTE_PERMISSIONS.find(({ path, match }) =>
+      match ? match.test(pathname) : isPathMatch(pathname, path)
+    )?.permission ?? null
+  );
 }

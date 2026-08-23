@@ -13,6 +13,13 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 400;
   }
 
+  if (err.name === 'ValidationError') {
+    message = Object.values(err.errors)
+      .map((validationError) => validationError.message)
+      .join(', ');
+    statusCode = 400;
+  }
+
   if (err.name === 'JsonWebTokenError') {
     message = 'Invalid token';
     statusCode = 401;
