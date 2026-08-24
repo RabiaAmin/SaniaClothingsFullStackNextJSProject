@@ -5,6 +5,20 @@
  */
 
 /**
+ * @typedef {Object} Notification
+ * @property {string} _id
+ * @property {string} type
+ * @property {string} message
+ * @property {User|string|null} actor
+ * @property {ProductionEntry|string|null} productionEntry
+ * @property {ProductionOrder|string|null} productionOrder
+ * @property {Object} metadata
+ * @property {boolean} isRead
+ * @property {string|null} readAt
+ * @property {string} createdAt
+ */
+
+/**
  * @typedef {Object} PayrollAuditEntry
  * @property {string} productionEntryId
  * @property {string} date

@@ -291,6 +291,34 @@ async function mockApi(page, options = {}) {
       reviewNotes: 'Count verified',
     },
   ];
+  const notifications = [
+    {
+      _id: 'notification-submitted',
+      recipient: currentUser._id,
+      actor: worker,
+      type: 'PRODUCTION_ENTRY_SUBMITTED',
+      message: 'worker submitted 40 pieces for PO-2026-001.',
+      productionEntry: productionEntries[0],
+      productionOrder,
+      metadata: { quantity: 40, poNumber: productionOrder.poNumber },
+      isRead: false,
+      readAt: null,
+      createdAt: '2026-08-24T08:00:00.000Z',
+    },
+    {
+      _id: 'notification-approved',
+      recipient: currentUser._id,
+      actor: user,
+      type: 'PRODUCTION_ENTRY_APPROVED',
+      message: 'Your production entry of 80 pieces for PO-2026-001 was approved.',
+      productionEntry: productionEntries[1],
+      productionOrder,
+      metadata: { quantity: 80, poNumber: productionOrder.poNumber },
+      isRead: true,
+      readAt: '2026-08-23T09:00:00.000Z',
+      createdAt: '2026-08-23T09:00:00.000Z',
+    },
+  ];
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
@@ -406,6 +434,50 @@ async function mockApi(page, options = {}) {
       return response(route, { success: true, user: currentUser });
     }
 
+    if (method === 'GET' && path === '/notifications/unread-count') {
+      return response(route, {
+        success: true,
+        unreadCount: notifications.filter((notification) => !notification.isRead).length,
+      });
+    }
+    if (method === 'GET' && path === '/notifications') {
+      if (options.notificationError) {
+        return response(route, { success: false, message: 'Could not load notifications' }, 500);
+      }
+      const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
+      const visibleNotifications = options.notificationEmpty
+        ? []
+        : notifications.filter((notification) => !unreadOnly || !notification.isRead);
+      return response(route, {
+        success: true,
+        notifications: visibleNotifications,
+        page: 1,
+        totalPages: 1,
+        totalRecords: visibleNotifications.length,
+      });
+    }
+    if (method === 'PATCH' && path === '/notifications/read-all') {
+      notifications.forEach((notification) => {
+        notification.isRead = true;
+        notification.readAt = new Date().toISOString();
+      });
+      return response(route, {
+        success: true,
+        message: 'All notifications marked as read',
+        modifiedCount: notifications.length,
+      });
+    }
+    if (method === 'PATCH' && path.startsWith('/notifications/') && path.endsWith('/read')) {
+      const notificationId = path.split('/')[2];
+      const notification = notifications.find((item) => item._id === notificationId);
+      if (!notification) {
+        return response(route, { success: false, message: 'Notification not found' }, 404);
+      }
+      notification.isRead = true;
+      notification.readAt = new Date().toISOString();
+      return response(route, { success: true, notification });
+    }
+
     if (method === 'GET' && path === '/production-orders') {
       return response(route, {
         success: true,
@@ -470,6 +542,9 @@ async function mockApi(page, options = {}) {
         productionEntries: visibleEntries,
         stats: {
           pendingEntries: visibleEntries.filter((entry) => entry.status === 'PENDING').length,
+          approvedEntries: visibleEntries.filter((entry) => entry.status === 'APPROVED').length,
+          rejectedEntries: visibleEntries.filter((entry) => entry.status === 'REJECTED').length,
+          submittedQuantity: visibleEntries.reduce((total, entry) => total + entry.quantity, 0),
           approvedQuantity: visibleEntries
             .filter((entry) => entry.status === 'APPROVED')
             .reduce((total, entry) => total + entry.quantity, 0),
@@ -729,11 +804,12 @@ async function mockApi(page, options = {}) {
 }
 
 async function signInAsAdmin(page) {
+  const testPort = process.env.PLAYWRIGHT_PORT ?? '3000';
   await page.context().addCookies([
     {
       name: 'token',
       value: 'test-token',
-      url: 'http://127.0.0.1:3000',
+      url: `http://127.0.0.1:${testPort}`,
       httpOnly: true,
       sameSite: 'Lax',
     },

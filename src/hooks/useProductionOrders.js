@@ -9,10 +9,11 @@ export const PRODUCTION_ORDER_KEYS = {
   detail: (id) => ['production-orders', 'detail', id],
 };
 
-export function useProductionOrders(params) {
+export function useProductionOrders(params, options = {}) {
   return useQuery({
     queryKey: PRODUCTION_ORDER_KEYS.list(params),
     queryFn: () => productionOrderApi.getProductionOrders(params).then((response) => response.data),
+    enabled: options.enabled ?? true,
   });
 }
 

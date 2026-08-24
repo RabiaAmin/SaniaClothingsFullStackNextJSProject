@@ -3,7 +3,10 @@ const ProductionEntry = require('../models/productionEntry.model');
 const ProductionOrder = require('../models/productionOrder.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { hasPermission } = require('../services/permission.service');
-const { reviewProductionEntry } = require('../services/productionEntry.service');
+const {
+  submitProductionEntry,
+  reviewProductionEntry,
+} = require('../services/productionEntry.service');
 
 const POPULATE_FIELDS = [
   {
@@ -57,29 +60,12 @@ exports.createProductionEntry = asyncHandler(async (req, res) => {
       .json({ success: false, message: 'Quantity must be a positive whole number' });
   }
 
-  const productionOrder = await ProductionOrder.findById(productionOrderId);
-  if (!productionOrder) {
-    return res.status(404).json({ success: false, message: 'Production order not found' });
-  }
-  if (['COMPLETED', 'CANCELLED'].includes(productionOrder.status)) {
-    return res
-      .status(409)
-      .json({ success: false, message: 'Production cannot be recorded against a closed order' });
-  }
-  if (parsedQuantity > productionOrder.orderedQuantity) {
-    return res.status(409).json({
-      success: false,
-      message: 'An entry quantity cannot exceed the production order quantity',
-    });
-  }
-
-  const productionEntry = await ProductionEntry.create({
-    productionOrder: productionOrder._id,
-    worker: req.user._id,
+  const productionEntry = await submitProductionEntry({
+    productionOrderId,
+    workerId: req.user._id,
+    workerName: req.user.username ?? req.user.email ?? 'A worker',
     date: parsedDate,
     quantity: parsedQuantity,
-    unitRate: productionOrder.workerRate,
-    totalAmount: parsedQuantity * productionOrder.workerRate,
     notes: typeof notes === 'string' ? notes.trim() : '',
   });
   await populateEntry(productionEntry);
@@ -156,6 +142,9 @@ exports.getProductionEntries = asyncHandler(async (req, res) => {
         $group: {
           _id: null,
           pendingEntries: { $sum: { $cond: [{ $eq: ['$status', 'PENDING'] }, 1, 0] } },
+          approvedEntries: { $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, 1, 0] } },
+          rejectedEntries: { $sum: { $cond: [{ $eq: ['$status', 'REJECTED'] }, 1, 0] } },
+          submittedQuantity: { $sum: '$quantity' },
           approvedQuantity: {
             $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, '$quantity', 0] },
           },
@@ -170,7 +159,14 @@ exports.getProductionEntries = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     productionEntries,
-    stats: totals[0] ?? { pendingEntries: 0, approvedQuantity: 0, approvedAmount: 0 },
+    stats: totals[0] ?? {
+      pendingEntries: 0,
+      approvedEntries: 0,
+      rejectedEntries: 0,
+      submittedQuantity: 0,
+      approvedQuantity: 0,
+      approvedAmount: 0,
+    },
     page,
     totalPages: Math.max(1, Math.ceil(totalRecords / limit)),
     totalRecords,

@@ -10,11 +10,12 @@ export const PRODUCTION_ENTRY_KEYS = {
   detail: (id) => ['production-entries', 'detail', id],
 };
 
-export function useProductionEntries(params) {
+export function useProductionEntries(params, options = {}) {
   return useQuery({
     queryKey: PRODUCTION_ENTRY_KEYS.list(params),
     queryFn: () =>
       productionEntryApi.getProductionEntries(params).then((response) => response.data),
+    enabled: options.enabled ?? true,
   });
 }
 

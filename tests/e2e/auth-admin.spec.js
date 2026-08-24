@@ -77,6 +77,7 @@ test('signed-in admin feature pages render with mocked data', async ({ page }) =
     ['/admin/products', 'Product Manager'],
     ['/users', 'User Access'],
     ['/roles', 'Roles & Permissions'],
+    ['/notifications', 'Notifications'],
   ];
 
   for (const [route, heading] of routes) {

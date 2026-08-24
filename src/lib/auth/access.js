@@ -5,6 +5,7 @@ export const PROTECTED_PATHS = [
   '/production-orders',
   '/production-entries',
   '/payroll',
+  '/notifications',
   '/clients',
   '/business',
   '/bank-accounts',

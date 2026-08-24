@@ -132,5 +132,37 @@ productionOrderSchema.statics.addApprovedQuantity = function addApprovedQuantity
   );
 };
 
+productionOrderSchema.statics.removeApprovedQuantity = function removeApprovedQuantity(
+  orderId,
+  quantity,
+  updatedBy
+) {
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new Error('Approved quantity decrement must be a positive whole number');
+  }
+  const nextApprovedQuantity = {
+    $subtract: [{ $ifNull: ['$approvedQuantity', 0] }, quantity],
+  };
+  return this.findOneAndUpdate(
+    {
+      _id: orderId,
+      approvedQuantity: { $gte: quantity },
+    },
+    [
+      {
+        $set: {
+          approvedQuantity: nextApprovedQuantity,
+          updatedBy,
+          updatedAt: new Date(),
+          status: {
+            $cond: [{ $eq: [nextApprovedQuantity, 0] }, 'PENDING', 'IN_PROGRESS'],
+          },
+        },
+      },
+    ],
+    { new: true }
+  );
+};
+
 module.exports = mongoose.model('ProductionOrder', productionOrderSchema);
 module.exports.PRODUCTION_ORDER_STATUSES = PRODUCTION_ORDER_STATUSES;

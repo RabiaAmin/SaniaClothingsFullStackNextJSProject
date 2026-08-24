@@ -17,6 +17,7 @@ const userManagementRoutes = require('./routes/userManagement.routes');
 const productionOrderRoutes = require('./routes/productionOrder.routes');
 const productionEntryRoutes = require('./routes/productionEntry.routes');
 const payrollRoutes = require('./routes/payroll.routes');
+const notificationRoutes = require('./routes/notification.routes');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -65,6 +66,7 @@ app.use('/api/v1/users', userManagementRoutes);
 app.use('/api/v1/production-orders', productionOrderRoutes);
 app.use('/api/v1/production-entries', productionEntryRoutes);
 app.use('/api/v1/payroll', payrollRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 app.use(errorHandler);
 

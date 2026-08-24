@@ -10,10 +10,11 @@ export const INVOICE_KEYS = {
   statements: (params) => ['invoices', 'statements', params],
 };
 
-export function useInvoices(params = {}) {
+export function useInvoices(params = {}, options = {}) {
   return useQuery({
     queryKey: INVOICE_KEYS.list(params),
     queryFn: () => invoiceApi.getAllInvoices(params).then((r) => r.data),
+    enabled: options.enabled ?? true,
   });
 }
 

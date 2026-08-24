@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import NotificationIndicator from '@/components/layout/NotificationIndicator';
 import { Menu, Scissors, Zap, Settings, LogOut, User, X } from 'lucide-react';
 
 export default function Navbar({ variant = 'admin', onMenuClick }) {
@@ -139,6 +140,8 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
       </Link>
 
       <div className="flex-1" />
+
+      <NotificationIndicator />
 
       {/* User avatar + dropdown */}
       <DropdownMenu>

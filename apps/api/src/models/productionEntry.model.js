@@ -49,6 +49,16 @@ const productionEntrySchema = new mongoose.Schema(
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user', default: null },
     reviewedAt: { type: Date, default: null },
     reviewNotes: { type: String, default: '', trim: true, maxlength: 2000 },
+    reviewLock: {
+      type: {
+        token: { type: String, required: true },
+        reviewer: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
+        decision: { type: String, enum: ['APPROVED', 'REJECTED'], required: true },
+        acquiredAt: { type: Date, required: true },
+      },
+      default: null,
+      select: false,
+    },
   },
   { timestamps: true }
 );
