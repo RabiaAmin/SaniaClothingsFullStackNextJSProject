@@ -42,5 +42,6 @@ Thumbs.db
 *.swo
 
 # Claude local docs
+.agent.md
 .claude/
 CLAUDE.md
