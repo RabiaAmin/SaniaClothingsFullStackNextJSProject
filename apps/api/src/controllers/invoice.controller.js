@@ -2,6 +2,7 @@ const Invoice = require('../models/invoice.model');
 const Client = require('../models/client.model');
 const BankAccount = require('../models/bankAccount.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { escapeRegex } = require('../utils/query');
 
 const generateInvoiceNumber = async () => {
   const [last] = await Invoice.aggregate([
@@ -112,8 +113,8 @@ exports.getInvoice = asyncHandler(async (req, res) => {
 });
 
 exports.getAllInvoices = asyncHandler(async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 40;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 40));
   const skip = (page - 1) * limit;
 
   const now = new Date();
@@ -127,7 +128,9 @@ exports.getAllInvoices = asyncHandler(async (req, res) => {
 
   const filter = { date: { $gte: startDate, $lte: endDate } };
 
-  if (req.query.poNumber) filter.poNumber = { $regex: req.query.poNumber, $options: 'i' };
+  if (req.query.poNumber) {
+    filter.poNumber = { $regex: escapeRegex(req.query.poNumber), $options: 'i' };
+  }
   if (req.query.toClient) filter.toClient = req.query.toClient;
 
   const [invoices, totalRecords, stats] = await Promise.all([

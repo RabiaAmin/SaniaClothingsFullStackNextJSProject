@@ -2,11 +2,16 @@ const ProductionOrder = require('../models/productionOrder.model');
 const mongoose = require('mongoose');
 const Client = require('../models/client.model');
 const Product = require('../models/product.model');
-const Invoice = require('../models/invoice.model');
 const ProductionEntry = require('../models/productionEntry.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { hasPermission } = require('../services/permission.service');
+const {
+  findInvoiceRelationship,
+  findInvoiceRelationships,
+  normalizePoNumber,
+} = require('../services/productionInvoice.service');
 const { PRODUCTION_ORDER_STATUSES } = ProductionOrder;
+const { escapeRegex } = require('../utils/query');
 
 const POPULATE_FIELDS = [
   { path: 'client', select: 'name email phone' },
@@ -14,14 +19,6 @@ const POPULATE_FIELDS = [
   { path: 'createdBy', select: 'username email' },
   { path: 'updatedBy', select: 'username email' },
 ];
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function normalizePoNumber(value) {
-  return typeof value === 'string' ? value.trim().toUpperCase() : '';
-}
 
 function parsePositiveInteger(value) {
   const number = Number(value);
@@ -152,7 +149,7 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
     filter.client = req.query.clientId;
   }
 
-  const [productionOrders, totalRecords] = await Promise.all([
+  let [productionOrders, totalRecords] = await Promise.all([
     ProductionOrder.find(filter)
       .populate(POPULATE_FIELDS)
       .sort({ dueDate: 1, createdAt: -1 })
@@ -160,6 +157,18 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
       .limit(limit),
     ProductionOrder.countDocuments(filter),
   ]);
+
+  if (hasPermission(req.user, 'invoice.read') && productionOrders.length > 0) {
+    const relationships = await findInvoiceRelationships(
+      productionOrders.map((order) => order.poNumber)
+    );
+    productionOrders = productionOrders.map((order) => {
+      const { invoices, ...invoiceRelationship } = relationships.get(
+        normalizePoNumber(order.poNumber)
+      );
+      return { ...order.toObject(), invoiceRelationship };
+    });
+  }
 
   res.status(200).json({
     success: true,
@@ -176,15 +185,17 @@ exports.getProductionOrder = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Production order not found' });
   }
 
-  const matchingInvoices = hasPermission(req.user, 'invoice.read')
-    ? await Invoice.find({
-        poNumber: { $regex: `^${escapeRegex(productionOrder.poNumber)}$`, $options: 'i' },
-      })
-        .select('invoiceNumber poNumber status totalAmount date')
-        .sort({ date: -1 })
-    : [];
+  const invoiceRelationship = hasPermission(req.user, 'invoice.read')
+    ? await findInvoiceRelationship(productionOrder.poNumber)
+    : null;
+  const matchingInvoices = invoiceRelationship?.invoices ?? [];
 
-  res.status(200).json({ success: true, productionOrder, matchingInvoices });
+  res.status(200).json({
+    success: true,
+    productionOrder,
+    invoiceRelationship,
+    matchingInvoices,
+  });
 });
 
 exports.updateProductionOrder = asyncHandler(async (req, res) => {
@@ -228,6 +239,15 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
       return res.status(409).json({
         success: false,
         message: 'Ordered quantity cannot be lower than approved production',
+      });
+    }
+    if (
+      quantity !== productionOrder.orderedQuantity &&
+      (await ProductionEntry.exists({ productionOrder: productionOrder._id }))
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ordered quantity cannot be changed after production entries have been submitted',
       });
     }
     productionOrder.orderedQuantity = quantity;

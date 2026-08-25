@@ -11,8 +11,34 @@ test('production order list supports progress, status, and PO search', async ({ 
   await expect(page.getByText('Ordered: 120')).toBeVisible();
   await expect(page.getByText('Produced: 80')).toBeVisible();
   await expect(page.getByText('Remaining: 40')).toBeVisible();
+  await expect(page.getByText('Invoice 1001')).toBeVisible();
+  await expect(page.getByText('Sent', { exact: true })).toBeVisible();
   await page.getByPlaceholder('Search PO number or description').fill('PO-2026-001');
   await expect(page.getByText('PO-2026-001', { exact: true })).toBeVisible();
+});
+
+test('detail view safely explains when no invoice matches the PO number', async ({ page }) => {
+  await mockApi(page, { noInvoiceMatch: true });
+  await signInAsAdmin(page);
+  await page.goto('/production-orders/production-order-1');
+
+  await expect(page.getByText('No matching invoice yet')).toBeVisible();
+  await expect(
+    page.getByText('Production can continue normally without an invoice.')
+  ).toBeVisible();
+});
+
+test('detail view lists multiple PO matches without selecting a single invoice', async ({
+  page,
+}) => {
+  await mockApi(page, { multipleInvoiceMatches: true });
+  await signInAsAdmin(page);
+  await page.goto('/production-orders/production-order-1');
+
+  await expect(page.getByText('2 possible matches')).toBeVisible();
+  await expect(page.getByText(/Multiple invoices use this PO number/)).toBeVisible();
+  await expect(page.getByRole('link', { name: /Invoice 1001/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Invoice 1002/ })).toBeVisible();
 });
 
 test('admin can create a production order independently from invoices', async ({ page }) => {
@@ -94,6 +120,7 @@ test('worker can read orders but cannot create, edit, or query client administra
   await expect(page.getByText('PO-2026-001', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'New Production Order' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Edit PO-2026-001' })).toHaveCount(0);
+  await expect(page.getByRole('columnheader', { name: 'Invoice' })).toHaveCount(0);
   expect(calls.some((call) => call.method === 'GET' && call.path === '/client/getAll')).toBe(false);
 
   await page.goto('/production-orders/create');

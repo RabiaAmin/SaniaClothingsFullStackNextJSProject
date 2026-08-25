@@ -2,6 +2,7 @@ const User = require('../models/user.model');
 const Role = require('../models/role.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { generateTemporaryPassword } = require('../services/password.service');
+const { canGrantPermissions } = require('../services/permission.service');
 
 function serializeManagedUser(user) {
   return {
@@ -19,19 +20,8 @@ function serializeManagedUser(user) {
   };
 }
 
-async function wouldRemoveLastAdmin(user, nextRole, nextActive) {
-  const currentRole = await Role.findById(user.role);
-  if (currentRole?.slug !== 'admin') return false;
-  if (nextRole?.slug === 'admin' && nextActive !== false) return false;
-
-  const adminRole = await Role.findOne({ slug: 'admin' });
-  if (!adminRole) return true;
-  const otherAdmins = await User.countDocuments({
-    _id: { $ne: user._id },
-    role: adminRole._id,
-    isActive: { $ne: false },
-  });
-  return otherAdmins === 0;
+function canManageRole(user, role) {
+  return !role || canGrantPermissions(user, role.permissions);
 }
 
 exports.getUsers = asyncHandler(async (req, res) => {
@@ -51,10 +41,16 @@ exports.createUser = asyncHandler(async (req, res) => {
     });
   }
 
-  const role = await Role.findById(roleId);
+  const role = await Role.findById(roleId).populate('permissions');
   if (!role) return res.status(400).json({ success: false, message: 'Role not found' });
   if (role.isActive === false) {
     return res.status(400).json({ success: false, message: 'Inactive roles cannot be assigned' });
+  }
+  if (!canManageRole(req.user, role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You cannot assign a role with permissions beyond your own access',
+    });
   }
 
   const temporaryPassword = generateTemporaryPassword();
@@ -83,14 +79,30 @@ exports.updateUserAccess = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-  let nextRole = user.role ? await Role.findById(user.role) : null;
+  const currentRole = user.role ? await Role.findById(user.role).populate('permissions') : null;
+  let nextRole = currentRole;
+  if (!canManageRole(req.user, currentRole)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You cannot manage a user whose role exceeds your own access',
+    });
+  }
   if (req.body.roleId !== undefined) {
-    nextRole = req.body.roleId === null ? null : await Role.findById(req.body.roleId);
+    nextRole =
+      req.body.roleId === null
+        ? null
+        : await Role.findById(req.body.roleId).populate('permissions');
     if (req.body.roleId !== null && !nextRole) {
       return res.status(400).json({ success: false, message: 'Role not found' });
     }
     if (nextRole?.isActive === false) {
       return res.status(400).json({ success: false, message: 'Inactive roles cannot be assigned' });
+    }
+    if (!canManageRole(req.user, nextRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You cannot assign a role with permissions beyond your own access',
+      });
     }
   }
 
@@ -98,10 +110,10 @@ exports.updateUserAccess = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'User status must be a boolean' });
   }
   const nextActive = req.body.isActive === undefined ? user.isActive : req.body.isActive;
-  if (await wouldRemoveLastAdmin(user, nextRole, nextActive)) {
-    return res.status(409).json({
+  if (currentRole?.slug === 'admin' && (nextRole?.slug !== 'admin' || nextActive === false)) {
+    return res.status(400).json({
       success: false,
-      message: 'At least one active Admin account is required',
+      message: 'Admin accounts cannot be deactivated or assigned to another role',
     });
   }
 

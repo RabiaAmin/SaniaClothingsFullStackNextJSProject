@@ -2,6 +2,7 @@ const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const Product = require('../models/product.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { escapeRegex } = require('../utils/query');
 
 const uploadToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
@@ -99,16 +100,17 @@ exports.getAllProducts = asyncHandler(async (req, res) => {
 
   const filter = {};
   if (active === 'true') filter.isActive = true;
-  if (category) filter.category = { $regex: category, $options: 'i' };
+  if (category) filter.category = { $regex: escapeRegex(category), $options: 'i' };
   if (search) {
+    const escapedSearch = escapeRegex(search);
     filter.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
+      { name: { $regex: escapedSearch, $options: 'i' } },
+      { description: { $regex: escapedSearch, $options: 'i' } },
     ];
   }
 
   let query = Product.find(filter).sort({ createdAt: -1 });
-  if (limit) query = query.limit(Number(limit));
+  if (limit) query = query.limit(Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20)));
 
   const products = await query;
   res.status(200).json({ success: true, products });

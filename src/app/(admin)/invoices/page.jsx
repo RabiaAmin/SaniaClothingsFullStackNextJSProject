@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useInvoices, useDeleteInvoice } from '@/hooks/useInvoices';
 import { useClients } from '@/hooks/useClients';
 import { toast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
 
 import PageHeader from '@/components/admin/PageHeader';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
@@ -15,6 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Plus, Send } from 'lucide-react';
 
 export default function InvoicesPage() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('invoice.create');
+  const canDelete = hasPermission('invoice.delete');
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -66,11 +70,13 @@ export default function InvoicesPage() {
         title="Invoice Manager"
         description="Create and manage your invoices"
         action={
-          <Button asChild>
-            <Link href="/invoices/create">
-              <Plus className="h-4 w-4" /> New Invoice
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild>
+              <Link href="/invoices/create">
+                <Plus className="h-4 w-4" /> New Invoice
+              </Link>
+            </Button>
+          ) : null
         }
       />
 
@@ -95,7 +101,7 @@ export default function InvoicesPage() {
         isLoading={isLoading}
         error={error}
         deletingId={deleteMutation.isPending ? deleteTarget : null}
-        onDelete={(id) => setDeleteTarget(id)}
+        onDelete={canDelete ? (id) => setDeleteTarget(id) : null}
         onCreate={null}
       />
 

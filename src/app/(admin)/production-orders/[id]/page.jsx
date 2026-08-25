@@ -57,6 +57,13 @@ export default function ProductionOrderDetailPage() {
   const updateStatus = useUpdateProductionOrderStatus();
   const deleteOrder = useDeleteProductionOrder();
   const order = data?.productionOrder;
+  const matchingInvoices = data?.matchingInvoices ?? [];
+  const invoiceRelationship = data?.invoiceRelationship ?? {
+    state:
+      matchingInvoices.length > 1 ? 'MULTIPLE' : matchingInvoices.length === 1 ? 'SINGLE' : 'NONE',
+    matchCount: matchingInvoices.length,
+    invoices: matchingInvoices,
+  };
   const produced = order?.approvedQuantity ?? order?.producedQuantity ?? 0;
   const remaining = order ? Math.max(0, order.orderedQuantity - produced) : 0;
   const progress = order?.orderedQuantity
@@ -252,32 +259,86 @@ export default function ProductionOrderDetailPage() {
         </Card>
       </div>
 
-      {(data?.matchingInvoices ?? []).length > 0 && (
-        <PermissionGuard permission="invoice.read">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Invoices with this PO number</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.matchingInvoices.map((invoice) => (
-                <Link
-                  key={invoice._id}
-                  href={`/invoices/${invoice._id}`}
-                  className="flex items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/50"
-                >
-                  <span className="flex items-center gap-2 font-medium">
-                    <FileText className="h-4 w-4" /> Invoice {invoice.invoiceNumber}
-                  </span>
-                  <span className="text-muted-foreground">{invoice.status}</span>
-                </Link>
-              ))}
-              <p className="text-xs text-muted-foreground">
-                This is a PO-number match only. Invoices and production orders remain independent.
+      <PermissionGuard permission="invoice.read">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Related Invoices</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Exact PO-number matches for {order.poNumber}
               </p>
-            </CardContent>
-          </Card>
-        </PermissionGuard>
-      )}
+            </div>
+            <Badge
+              variant={
+                invoiceRelationship.state === 'MULTIPLE'
+                  ? 'warning'
+                  : invoiceRelationship.state === 'SINGLE'
+                    ? 'success'
+                    : 'secondary'
+              }
+            >
+              {invoiceRelationship.state === 'NONE'
+                ? 'No invoice'
+                : invoiceRelationship.state === 'SINGLE'
+                  ? '1 match'
+                  : `${invoiceRelationship.matchCount} possible matches`}
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {invoiceRelationship.state === 'NONE' ? (
+              <div className="flex items-start gap-3 rounded-lg border border-dashed p-4">
+                <FileText className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">No matching invoice yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Production can continue normally without an invoice.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {invoiceRelationship.state === 'MULTIPLE' && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    Multiple invoices use this PO number. Review each match; the system does not
+                    assume that any single invoice owns this Production Order.
+                  </div>
+                )}
+                {matchingInvoices.map((invoice) => (
+                  <Link
+                    key={invoice._id}
+                    href={`/invoices/${invoice._id}`}
+                    className="flex flex-col gap-2 rounded-lg border p-3 text-sm hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <FileText className="h-4 w-4" /> Invoice {invoice.invoiceNumber}
+                    </span>
+                    <span className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span>{formatDate(invoice.date)}</span>
+                      <span>{formatCurrency(invoice.totalAmount ?? 0)}</span>
+                      <Badge
+                        variant={
+                          invoice.status === 'Paid'
+                            ? 'success'
+                            : invoice.status === 'Pending'
+                              ? 'warning'
+                              : 'default'
+                        }
+                      >
+                        {invoice.status}
+                      </Badge>
+                    </span>
+                  </Link>
+                ))}
+              </>
+            )}
+            <p className="text-xs text-muted-foreground">
+              This relationship is calculated from the PO number only. Invoice creation, editing,
+              deletion, and payment status remain independent from production.
+            </p>
+          </CardContent>
+        </Card>
+      </PermissionGuard>
 
       <ConfirmDialog
         open={deleteOpen}

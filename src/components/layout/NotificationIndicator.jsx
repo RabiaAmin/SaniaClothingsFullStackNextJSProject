@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +21,6 @@ import { notificationTarget, notificationTypeLabel } from '@/lib/notifications';
 import { formatRelativeTime } from '@/lib/utils/formatters';
 
 export default function NotificationIndicator() {
-  const router = useRouter();
   const { data: countData } = useUnreadNotificationCount();
   const { data, isLoading, error } = useNotifications(
     { page: 1, limit: 5 },
@@ -35,7 +33,6 @@ export default function NotificationIndicator() {
 
   function handleNotification(notification) {
     if (!notification.isRead) markRead.mutate(notification._id);
-    router.push(notificationTarget(notification));
   }
 
   return (
@@ -85,23 +82,25 @@ export default function NotificationIndicator() {
           </div>
         ) : (
           notifications.map((notification) => (
-            <DropdownMenuItem
-              key={notification._id}
-              className="flex cursor-pointer items-start gap-3 rounded-none px-3 py-3"
-              onSelect={() => handleNotification(notification)}
-            >
-              <span
-                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead ? 'bg-muted' : 'bg-primary'}`}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-medium text-muted-foreground">
-                  {notificationTypeLabel(notification.type)}
+            <DropdownMenuItem key={notification._id} asChild className="rounded-none p-0">
+              <Link
+                href={notificationTarget(notification)}
+                className="flex cursor-pointer items-start gap-3 px-3 py-3"
+                onClick={() => handleNotification(notification)}
+              >
+                <span
+                  className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead ? 'bg-muted' : 'bg-primary'}`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-medium text-muted-foreground">
+                    {notificationTypeLabel(notification.type)}
+                  </span>
+                  <span className="mt-0.5 block text-sm leading-snug">{notification.message}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {formatRelativeTime(notification.createdAt)}
+                  </span>
                 </span>
-                <span className="mt-0.5 block text-sm leading-snug">{notification.message}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  {formatRelativeTime(notification.createdAt)}
-                </span>
-              </span>
+              </Link>
             </DropdownMenuItem>
           ))
         )}

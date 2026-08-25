@@ -86,6 +86,17 @@
  * @property {string} dueDate
  * @property {'PENDING'|'IN_PROGRESS'|'COMPLETED'|'CANCELLED'} status
  * @property {string} notes
+ * @property {InvoiceRelationship|null} [invoiceRelationship]
+ */
+
+/**
+ * Read-only PO-number relationship calculated for users with invoice access.
+ * @typedef {Object} InvoiceRelationship
+ * @property {'NONE'|'SINGLE'|'MULTIPLE'} state
+ * @property {number} matchCount
+ * @property {string[]} statuses
+ * @property {Invoice|null} latestInvoice
+ * @property {Invoice[]} [invoices]
  */
 
 /**

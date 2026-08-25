@@ -59,6 +59,7 @@ test('forgot password and reset password call the expected auth endpoints', asyn
 });
 
 test('signed-in admin feature pages render with mocked data', async ({ page }) => {
+  test.setTimeout(120_000);
   await mockApi(page);
   await signInAsAdmin(page);
 

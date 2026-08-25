@@ -116,3 +116,48 @@ test('temporary-password user creation forces a one-time password change', async
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Invalid Email Or Password!')).toBeVisible();
 });
+
+test('read-only custom permissions hide mutations and block direct edit URLs', async ({ page }) => {
+  await mockApi(page, {
+    user: {
+      _id: 'user-auditor',
+      username: 'auditor',
+      email: 'auditor@sania.test',
+      isActive: true,
+      mustChangePassword: false,
+      role: { _id: 'role-auditor', name: 'Auditor', slug: 'auditor' },
+      permissions: [
+        'invoice.read',
+        'client.read',
+        'product.read',
+        'business.read',
+        'bank_account.read',
+      ],
+    },
+  });
+
+  await page.goto('/invoices');
+  await expect(page.getByRole('heading', { name: 'Invoice Manager' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'New Invoice' })).toHaveCount(0);
+
+  await page.goto('/invoices/create');
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+
+  await page.goto('/invoices/invoice-1/edit');
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+
+  await page.goto('/admin/products');
+  await expect(page.getByRole('button', { name: 'Add Product' })).toHaveCount(0);
+
+  await page.goto('/admin/products/create');
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+
+  await page.goto('/clients');
+  await expect(page.getByRole('button', { name: 'Add Client' })).toHaveCount(0);
+
+  await page.goto('/business');
+  await expect(page.getByRole('button', { name: /Add Business|Edit/ })).toHaveCount(0);
+
+  await page.goto('/bank-accounts');
+  await expect(page.getByRole('button', { name: 'Add Account' })).toHaveCount(0);
+});

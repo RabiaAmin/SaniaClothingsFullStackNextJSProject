@@ -95,7 +95,7 @@ test('approval displays a backend error when only 40 pieces remain but 50 are cl
   await page.getByRole('button', { name: 'Approve entry for PO-2026-001' }).click();
   await page.getByRole('button', { name: 'Approve entry', exact: true }).click();
 
-  await expect(page.getByText(/exceeds the remaining quantity/i)).toBeVisible();
+  await expect(page.getByText(/exceeds the remaining quantity/i).first()).toBeVisible();
   expect(
     calls.some(
       (call) =>

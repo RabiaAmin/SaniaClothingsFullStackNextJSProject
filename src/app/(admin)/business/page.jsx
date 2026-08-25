@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useFetch } from '@/hooks/useFetch';
 import businessApi from '@/lib/api/business.api';
 import { toast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
 
 import PageHeader from '@/components/admin/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -224,7 +225,7 @@ function BusinessDialog({ open, onClose, business, onSaved }) {
 }
 
 // ── Business Card ─────────────────────────────────────────────────────────────
-function BusinessCard({ business, onEdit }) {
+function BusinessCard({ business, onEdit, canEdit }) {
   const rows = [
     { icon: Mail, value: business.email, label: 'Email' },
     { icon: Phone, value: business.phone, label: 'Mobile' },
@@ -256,9 +257,11 @@ function BusinessCard({ business, onEdit }) {
             <p className="text-xs text-muted-foreground">{business.currency ?? 'ZAR'}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => onEdit(business)}>
-          <Pencil className="h-3.5 w-3.5" /> Edit
-        </Button>
+        {canEdit && (
+          <Button variant="outline" size="sm" onClick={() => onEdit(business)}>
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-2">
         {rows.map(({ icon: Icon, value, label }) => (
@@ -275,6 +278,9 @@ function BusinessCard({ business, onEdit }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function BusinessPage() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('business.create');
+  const canUpdate = hasPermission('business.update');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
 
@@ -302,9 +308,11 @@ export default function BusinessPage() {
         title="Business Profile"
         description="Manage your business identities used on invoices"
         action={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Add Business
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Add Business
+            </Button>
+          ) : null
         }
       />
 
@@ -335,15 +343,17 @@ export default function BusinessPage() {
           title="No business profiles"
           description="Add a business profile to start issuing invoices."
           action={
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Add Business
-            </Button>
+            canCreate ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Add Business
+              </Button>
+            ) : null
           }
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {businesses.map((b) => (
-            <BusinessCard key={b._id ?? b.id} business={b} onEdit={openEdit} />
+            <BusinessCard key={b._id ?? b.id} business={b} onEdit={openEdit} canEdit={canUpdate} />
           ))}
         </div>
       )}

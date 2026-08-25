@@ -1,10 +1,14 @@
 const Role = require('../models/role.model');
 const Permission = require('../models/permission.model');
 const User = require('../models/user.model');
+const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
+const { canGrantPermissions } = require('../services/permission.service');
 
 async function resolvePermissions(permissionIds) {
-  const uniqueIds = [...new Set(permissionIds || [])];
+  if (!Array.isArray(permissionIds)) return null;
+  const uniqueIds = [...new Set(permissionIds.map(String))];
+  if (!uniqueIds.every((id) => mongoose.isValidObjectId(id))) return null;
   const permissions = await Permission.find({ _id: { $in: uniqueIds } });
 
   if (permissions.length !== uniqueIds.length) {
@@ -54,6 +58,12 @@ exports.createRole = asyncHandler(async (req, res) => {
   if (!permissions) {
     return res.status(400).json({ success: false, message: 'One or more permissions are invalid' });
   }
+  if (!canGrantPermissions(req.user, permissions)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You cannot grant permissions that your own role does not have',
+    });
+  }
 
   const role = await Role.create({
     name,
@@ -68,13 +78,19 @@ exports.createRole = asyncHandler(async (req, res) => {
 });
 
 exports.updateRole = asyncHandler(async (req, res) => {
-  const role = await Role.findById(req.params.id);
+  const role = await Role.findById(req.params.id).populate('permissions');
   if (!role) return res.status(404).json({ success: false, message: 'Role not found' });
 
   if (role.slug === 'admin') {
     return res.status(400).json({
       success: false,
       message: 'The Admin role is protected and always retains full access',
+    });
+  }
+  if (!canGrantPermissions(req.user, role.permissions)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You cannot manage a role with permissions beyond your own access',
     });
   }
 
@@ -110,6 +126,12 @@ exports.updateRole = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: 'One or more permissions are invalid' });
     }
+    if (!canGrantPermissions(req.user, permissions)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You cannot grant permissions that your own role does not have',
+      });
+    }
     role.permissions = permissions.map((permission) => permission._id);
   }
 
@@ -119,10 +141,16 @@ exports.updateRole = asyncHandler(async (req, res) => {
 });
 
 exports.deleteRole = asyncHandler(async (req, res) => {
-  const role = await Role.findById(req.params.id);
+  const role = await Role.findById(req.params.id).populate('permissions');
   if (!role) return res.status(404).json({ success: false, message: 'Role not found' });
   if (role.isSystem) {
     return res.status(400).json({ success: false, message: 'System roles cannot be deleted' });
+  }
+  if (!canGrantPermissions(req.user, role.permissions)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You cannot delete a role with permissions beyond your own access',
+    });
   }
 
   const assignedUsers = await User.countDocuments({ role: role._id });

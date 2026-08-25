@@ -319,6 +319,25 @@ async function mockApi(page, options = {}) {
       createdAt: '2026-08-23T09:00:00.000Z',
     },
   ];
+  const relatedInvoices = options.noInvoiceMatch
+    ? []
+    : [
+        {
+          ...invoices[0],
+          poNumber: productionOrder.poNumber,
+        },
+        ...(options.multipleInvoiceMatches
+          ? [{ ...invoices[1], poNumber: productionOrder.poNumber }]
+          : []),
+      ];
+  const invoiceRelationship = {
+    state:
+      relatedInvoices.length === 0 ? 'NONE' : relatedInvoices.length === 1 ? 'SINGLE' : 'MULTIPLE',
+    matchCount: relatedInvoices.length,
+    statuses: [...new Set(relatedInvoices.map((invoice) => invoice.status))],
+    latestInvoice: relatedInvoices[0] ?? null,
+    invoices: relatedInvoices,
+  };
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
@@ -348,16 +367,6 @@ async function mockApi(page, options = {}) {
         }
         sessionUser = createdUser;
       }
-      const pageOrigin = new URL(page.url()).origin;
-      await page.context().addCookies([
-        {
-          name: 'token',
-          value: 'test-token',
-          url: pageOrigin,
-          httpOnly: true,
-          sameSite: 'Lax',
-        },
-      ]);
       return response(route, { success: true, token: 'test-token', user: sessionUser }, 200, {
         'set-cookie': 'token=test-token; Path=/; SameSite=Lax; HttpOnly',
       });
@@ -481,7 +490,13 @@ async function mockApi(page, options = {}) {
     if (method === 'GET' && path === '/production-orders') {
       return response(route, {
         success: true,
-        productionOrders: [{ ...productionOrder, approvedQuantity: currentApprovedQuantity }],
+        productionOrders: [
+          {
+            ...productionOrder,
+            approvedQuantity: currentApprovedQuantity,
+            invoiceRelationship,
+          },
+        ],
         page: 1,
         totalPages: 1,
         totalRecords: 1,
@@ -502,14 +517,8 @@ async function mockApi(page, options = {}) {
       return response(route, {
         success: true,
         productionOrder,
-        matchingInvoices: [
-          {
-            _id: 'invoice-1',
-            invoiceNumber: '1001',
-            poNumber: productionOrder.poNumber,
-            status: 'Paid',
-          },
-        ],
+        invoiceRelationship,
+        matchingInvoices: relatedInvoices,
       });
     }
     if (method === 'PUT' && path.startsWith('/production-orders/')) {

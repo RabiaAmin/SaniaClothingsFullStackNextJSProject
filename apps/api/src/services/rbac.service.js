@@ -90,6 +90,22 @@ async function upsertPermission([key, resource, action, description]) {
   );
 }
 
+async function assignInitialAdminSafely(adminRole) {
+  const rolelessFilter = { $or: [{ role: { $exists: false } }, { role: null }] };
+  const activeAdminCount = await User.countDocuments({
+    role: adminRole._id,
+    isActive: { $ne: false },
+  });
+  if (activeAdminCount > 0) return null;
+
+  const initialAdministrator = await User.findOne(rolelessFilter).sort({ _id: 1 });
+  if (!initialAdministrator) return null;
+
+  initialAdministrator.role = adminRole._id;
+  await initialAdministrator.save({ validateBeforeSave: false });
+  return initialAdministrator;
+}
+
 async function initializeRbac() {
   const payrollKeys = ['payroll.read_own', 'payroll.read_all'];
   const existingPayrollKeys = new Set(
@@ -141,25 +157,17 @@ async function initializeRbac() {
     }
   }
 
-  const migration = await User.updateMany(
-    { $or: [{ role: { $exists: false } }, { role: null }] },
-    { $set: { role: roles.admin._id, isActive: true } }
-  );
-
-  if (migration.modifiedCount > 0) {
-    console.log(`RBAC migration assigned Admin to ${migration.modifiedCount} existing user(s)`);
+  const initialAdministrator = await assignInitialAdminSafely(roles.admin);
+  if (initialAdministrator) {
+    console.log(`RBAC migration assigned Admin to existing user ${initialAdministrator._id}`);
   }
 
   return roles;
-}
-
-async function getDefaultRegistrationRole() {
-  return Role.findOne({ slug: 'worker' });
 }
 
 module.exports = {
   PERMISSIONS,
   ROLE_DEFINITIONS,
   initializeRbac,
-  getDefaultRegistrationRole,
+  assignInitialAdminSafely,
 };

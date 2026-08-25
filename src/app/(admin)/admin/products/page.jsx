@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProducts, useDeleteProduct, useUpdateProduct } from '@/hooks/useProducts';
 import { toast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
 
 import PageHeader from '@/components/admin/PageHeader';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
@@ -17,6 +18,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Package, Search } from 'lucide-react';
 
 export default function ProductsPage() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('product.create');
+  const canUpdate = hasPermission('product.update');
+  const canDelete = hasPermission('product.delete');
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -69,9 +74,11 @@ export default function ProductsPage() {
         title="Product Manager"
         description="Manage your product catalogue"
         action={
-          <Button onClick={() => router.push('/admin/products/create')}>
-            <Plus className="h-4 w-4" /> Add Product
-          </Button>
+          canCreate ? (
+            <Button onClick={() => router.push('/admin/products/create')}>
+              <Plus className="h-4 w-4" /> Add Product
+            </Button>
+          ) : null
         }
       />
 
@@ -103,18 +110,20 @@ export default function ProductsPage() {
               title="No products yet"
               description="Add your first product to start your catalogue."
               action={
-                <Button onClick={() => router.push('/admin/products/create')}>
-                  <Plus className="h-4 w-4" /> Add Product
-                </Button>
+                canCreate ? (
+                  <Button onClick={() => router.push('/admin/products/create')}>
+                    <Plus className="h-4 w-4" /> Add Product
+                  </Button>
+                ) : null
               }
               className="m-6"
             />
           ) : (
             <ProductTable
               products={displayed}
-              onEdit={(p) => router.push(`/admin/products/${p._id}/edit`)}
-              onDelete={(id) => setDeleteTarget(id)}
-              onToggleActive={handleToggleActive}
+              onEdit={canUpdate ? (p) => router.push(`/admin/products/${p._id}/edit`) : null}
+              onDelete={canDelete ? (id) => setDeleteTarget(id) : null}
+              onToggleActive={canUpdate ? handleToggleActive : null}
             />
           )}
         </CardContent>

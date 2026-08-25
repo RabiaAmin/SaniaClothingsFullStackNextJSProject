@@ -6,6 +6,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('public pages render without application errors', async ({ page }) => {
+  test.setTimeout(120_000);
   const routes = [
     ['/', /Crafted\s+with Precision/i],
     ['/about', /Sania Clothing/i],

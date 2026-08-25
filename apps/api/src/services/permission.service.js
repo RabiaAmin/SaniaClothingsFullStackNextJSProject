@@ -30,9 +30,14 @@ function hasAnyPermission(user, requiredPermissions) {
   return requiredPermissions.some((permission) => hasPermission(user, permission));
 }
 
+function canGrantPermissions(user, permissions) {
+  return (permissions || []).every((permission) => hasPermission(user, permissionKey(permission)));
+}
+
 module.exports = {
   permissionMatches,
   getPermissionKeys,
   hasPermission,
   hasAnyPermission,
+  canGrantPermissions,
 };

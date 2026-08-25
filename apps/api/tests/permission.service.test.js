@@ -4,6 +4,7 @@ const {
   permissionMatches,
   hasPermission,
   hasAnyPermission,
+  canGrantPermissions,
 } = require('../src/services/permission.service');
 const { authorize } = require('../src/middleware/authorization.middleware');
 const { PERMISSIONS, ROLE_DEFINITIONS } = require('../src/services/rbac.service');
@@ -29,6 +30,18 @@ test('permission checks accept populated permission documents', () => {
     hasAnyPermission(user, ['production_entry.approve', 'production_entry.create']),
     true
   );
+});
+
+test('role managers cannot grant permissions beyond their own authority', () => {
+  const scopedManager = {
+    role: { permissions: [{ key: 'role.create' }, { key: 'invoice.read' }] },
+  };
+  const admin = { role: { permissions: [{ key: '*' }] } };
+
+  assert.equal(canGrantPermissions(scopedManager, [{ key: 'invoice.read' }]), true);
+  assert.equal(canGrantPermissions(scopedManager, [{ key: 'invoice.*' }]), false);
+  assert.equal(canGrantPermissions(scopedManager, [{ key: '*' }]), false);
+  assert.equal(canGrantPermissions(admin, [{ key: '*' }, { key: 'user.update' }]), true);
 });
 
 test('authorization middleware returns 403 when a user lacks permission', () => {

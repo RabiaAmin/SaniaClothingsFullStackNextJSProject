@@ -5,7 +5,6 @@ const nodemailer = require('nodemailer');
 const User = require('../models/user.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { generateToken, clearToken } = require('../services/token.service');
-const { getDefaultRegistrationRole } = require('../services/rbac.service');
 const { getPermissionKeys } = require('../services/permission.service');
 const { validatePermanentPassword } = require('../services/password.service');
 
@@ -71,8 +70,6 @@ const sendEmail = async (option) => {
 
 exports.register = asyncHandler(async (req, res) => {
   const { username, email, phone, password, aboutMe } = req.body;
-  const defaultRole = await getDefaultRegistrationRole();
-
   let avatar = { public_id: '', url: '' };
 
   if (req.file) {
@@ -87,7 +84,9 @@ exports.register = asyncHandler(async (req, res) => {
     password,
     aboutMe,
     avatar,
-    role: defaultRole?._id || null,
+    // Public registration never grants internal business permissions. An administrator
+    // must explicitly assign a database role through User Access.
+    role: null,
   });
 
   await user.populate({ path: 'role', populate: { path: 'permissions' } });

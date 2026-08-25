@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { createPdfFilename, exportElementToPdf, printElement } from '@/lib/utils/pdfExport';
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import PermissionGuard from '@/components/auth/PermissionGuard';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Pencil, Trash2, Printer, AlertCircle, Download, Loader2 } from 'lucide-react';
@@ -165,14 +166,18 @@ export default function ViewInvoicePage() {
           )}
           Download PDF
         </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href={`/invoices/${id}/edit`}>
-            <Pencil className="h-4 w-4" /> Edit
-          </Link>
-        </Button>
-        <Button size="sm" variant="destructive" onClick={() => setShowDelete(true)}>
-          <Trash2 className="h-4 w-4" /> Delete
-        </Button>
+        <PermissionGuard permission="invoice.update">
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/invoices/${id}/edit`}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Link>
+          </Button>
+        </PermissionGuard>
+        <PermissionGuard permission="invoice.delete">
+          <Button size="sm" variant="destructive" onClick={() => setShowDelete(true)}>
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+        </PermissionGuard>
       </div>
 
       {/* ── Invoice Document ─────────────────────────────────────────────── */}

@@ -81,36 +81,46 @@ export default function ProductTable({ products, onEdit, onDelete, onToggleActiv
               )}
             </TableCell>
             <TableCell className="text-right">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit(p)}>
-                    <Pencil className="h-4 w-4" /> Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onToggleActive(p)}>
-                    {p.isActive ? (
+              {(onEdit || onDelete || onToggleActive) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {onEdit && (
+                      <DropdownMenuItem onClick={() => onEdit(p)}>
+                        <Pencil className="h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                    )}
+                    {onToggleActive && (
+                      <DropdownMenuItem onClick={() => onToggleActive(p)}>
+                        {p.isActive ? (
+                          <>
+                            <ToggleLeft className="h-4 w-4" /> Set Inactive
+                          </>
+                        ) : (
+                          <>
+                            <ToggleRight className="h-4 w-4" /> Set Active
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    )}
+                    {onDelete && (
                       <>
-                        <ToggleLeft className="h-4 w-4" /> Set Inactive
-                      </>
-                    ) : (
-                      <>
-                        <ToggleRight className="h-4 w-4" /> Set Active
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => onDelete(p._id)}
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </DropdownMenuItem>
                       </>
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={() => onDelete(p._id)}
-                  >
-                    <Trash2 className="h-4 w-4" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </TableCell>
           </TableRow>
         ))}

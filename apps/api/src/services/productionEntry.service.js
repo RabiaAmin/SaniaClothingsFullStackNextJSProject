@@ -51,16 +51,25 @@ async function submitProductionEntry({
     notes,
   });
 
-  await notificationService.createNotificationsForAnyPermission({
-    permissions: ['production_entry.approve', 'production_entry.reject'],
-    excludeUserIds: [workerId],
-    type: NOTIFICATION_TYPES.PRODUCTION_ENTRY_SUBMITTED,
-    actor: workerId,
-    message: `${workerName} submitted ${quantity} pieces for ${order.poNumber}.`,
-    productionEntry: submittedEntry._id,
-    productionOrder: order._id,
-    metadata: { quantity, poNumber: order.poNumber },
-  });
+  try {
+    await notificationService.createNotificationsForAnyPermission({
+      permissions: ['production_entry.approve', 'production_entry.reject'],
+      excludeUserIds: [workerId],
+      type: NOTIFICATION_TYPES.PRODUCTION_ENTRY_SUBMITTED,
+      actor: workerId,
+      message: `${workerName} submitted ${quantity} pieces for ${order.poNumber}.`,
+      productionEntry: submittedEntry._id,
+      productionOrder: order._id,
+      metadata: { quantity, poNumber: order.poNumber },
+    });
+  } catch (notificationError) {
+    // The entry is already persisted. Returning an error would encourage a retry and
+    // duplicate the worker's production claim, so notification failure is isolated.
+    console.error(
+      'Failed to create production submission notifications:',
+      notificationError.message
+    );
+  }
 
   return submittedEntry;
 }

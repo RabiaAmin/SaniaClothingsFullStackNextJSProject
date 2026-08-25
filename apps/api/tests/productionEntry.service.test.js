@@ -182,6 +182,46 @@ test('submission works without transactions and creates reviewer notifications',
   }
 });
 
+test('a notification failure does not report a persisted production claim as failed', async () => {
+  const originals = {
+    orderFindById: ProductionOrder.findById,
+    entryCreate: ProductionEntry.create,
+    notify: notificationService.createNotificationsForAnyPermission,
+    consoleError: console.error,
+  };
+  const entry = { _id: new mongoose.Types.ObjectId(), unitRate: 15, totalAmount: 150 };
+
+  ProductionOrder.findById = async () => ({
+    _id: new mongoose.Types.ObjectId(),
+    poNumber: 'PO-NOTIFY',
+    status: 'IN_PROGRESS',
+    orderedQuantity: 100,
+    workerRate: 15,
+  });
+  ProductionEntry.create = async (document) => Object.assign(entry, document);
+  notificationService.createNotificationsForAnyPermission = async () => {
+    throw new Error('notification insert failed');
+  };
+  console.error = () => {};
+
+  try {
+    const result = await submitProductionEntry({
+      productionOrderId: new mongoose.Types.ObjectId(),
+      workerId: new mongoose.Types.ObjectId(),
+      workerName: 'Worker',
+      date: new Date(),
+      quantity: 10,
+    });
+    assert.equal(result, entry);
+    assert.equal(result.quantity, 10);
+  } finally {
+    ProductionOrder.findById = originals.orderFindById;
+    ProductionEntry.create = originals.entryCreate;
+    notificationService.createNotificationsForAnyPermission = originals.notify;
+    console.error = originals.consoleError;
+  }
+});
+
 test('approval rolls back when the claimed quantity exceeds the remaining order quantity', async () => {
   const entry = {
     worker: new mongoose.Types.ObjectId(),

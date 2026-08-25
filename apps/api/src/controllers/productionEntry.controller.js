@@ -185,7 +185,11 @@ exports.getProductionEntry = asyncHandler(async (req, res) => {
 });
 
 exports.updateProductionEntry = asyncHandler(async (req, res) => {
-  const productionEntry = await ProductionEntry.findById(req.params.id);
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ success: false, message: 'Invalid production entry identifier' });
+  }
+
+  const productionEntry = await ProductionEntry.findById(req.params.id).select('+reviewLock');
   if (!productionEntry) {
     return res.status(404).json({ success: false, message: 'Production entry not found' });
   }
@@ -199,6 +203,25 @@ exports.updateProductionEntry = asyncHandler(async (req, res) => {
       .status(409)
       .json({ success: false, message: 'Only pending production entries can be updated' });
   }
+  if (productionEntry.reviewLock) {
+    return res.status(409).json({
+      success: false,
+      message: 'This production entry is currently being reviewed',
+    });
+  }
+
+  const order = await ProductionOrder.findById(productionEntry.productionOrder);
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Production order not found' });
+  }
+  if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+    return res.status(409).json({
+      success: false,
+      message: 'Entries cannot be changed after the production order is closed',
+    });
+  }
+
+  const updates = {};
 
   if (req.body.quantity !== undefined) {
     const quantity = parsePositiveInteger(req.body.quantity);
@@ -207,32 +230,49 @@ exports.updateProductionEntry = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: 'Quantity must be a positive whole number' });
     }
-    const order = await ProductionOrder.findById(productionEntry.productionOrder);
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Production order not found' });
-    }
     if (quantity > order.orderedQuantity) {
       return res.status(409).json({
         success: false,
         message: 'An entry quantity cannot exceed the production order quantity',
       });
     }
-    productionEntry.quantity = quantity;
+    updates.quantity = quantity;
+    updates.totalAmount =
+      Math.round((quantity * productionEntry.unitRate + Number.EPSILON) * 100) / 100;
   }
   if (req.body.date !== undefined) {
     const date = parseDate(req.body.date);
     if (!date)
       return res.status(400).json({ success: false, message: 'Please provide a valid entry date' });
-    productionEntry.date = date;
+    updates.date = date;
   }
-  if (req.body.notes !== undefined) productionEntry.notes = req.body.notes;
+  if (req.body.notes !== undefined) {
+    if (typeof req.body.notes !== 'string') {
+      return res.status(400).json({ success: false, message: 'Notes must be text' });
+    }
+    updates.notes = req.body.notes.trim();
+  }
 
-  await productionEntry.save();
-  await populateEntry(productionEntry);
+  const updatedEntry = await ProductionEntry.findOneAndUpdate(
+    {
+      _id: productionEntry._id,
+      status: 'PENDING',
+      $or: [{ reviewLock: null }, { reviewLock: { $exists: false } }],
+    },
+    { $set: updates },
+    { new: true, runValidators: true }
+  );
+  if (!updatedEntry) {
+    return res.status(409).json({
+      success: false,
+      message: 'This production entry changed or entered review; refresh and try again',
+    });
+  }
+  await populateEntry(updatedEntry);
   res.status(200).json({
     success: true,
     message: 'Production entry updated successfully',
-    productionEntry,
+    productionEntry: updatedEntry,
   });
 });
 

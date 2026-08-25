@@ -1,5 +1,4 @@
 const express = require('express');
-const multer = require('multer');
 const router = express.Router();
 const {
   register,
@@ -12,20 +11,13 @@ const {
   resetPassword,
 } = require('../controllers/auth.controller');
 const { protect, requirePasswordChangeComplete } = require('../middleware/auth.middleware');
+const { singleAvatar } = require('../middleware/upload.middleware');
 
-const upload = multer({ storage: multer.memoryStorage() });
-
-router.post('/register', upload.single('avatar'), register);
+router.post('/register', singleAvatar, register);
 router.post('/login', login);
 router.get('/logout', logout);
 router.get('/getUser', protect, getUser);
-router.put(
-  '/update/profile',
-  protect,
-  requirePasswordChangeComplete,
-  upload.single('avatar'),
-  updateProfile
-);
+router.put('/update/profile', protect, requirePasswordChangeComplete, singleAvatar, updateProfile);
 router.put('/update/password', protect, updatePassword);
 router.post('/password/forgot', forgotPassword);
 router.put('/password/reset/:token', resetPassword);

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useFetch } from '@/hooks/useFetch';
 import bankAccountApi from '@/lib/api/bankAccount.api';
 import { toast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
 
 import PageHeader from '@/components/admin/PageHeader';
 import StatusBadge from '@/components/admin/StatusBadge';
@@ -189,6 +190,10 @@ function BankAccountDialog({ open, onClose, account, onSaved }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function BankAccountsPage() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('bank_account.create');
+  const canUpdate = hasPermission('bank_account.update');
+  const canDelete = hasPermission('bank_account.delete');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -236,9 +241,11 @@ export default function BankAccountsPage() {
         title="Bank Account Manager"
         description="Manage bank accounts for your businesses"
         action={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Add Account
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Add Account
+            </Button>
+          ) : null
         }
       />
 
@@ -256,9 +263,11 @@ export default function BankAccountsPage() {
               title="No bank accounts"
               description="Add a bank account to include payment details on invoices."
               action={
-                <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> Add Account
-                </Button>
+                canCreate ? (
+                  <Button onClick={openCreate}>
+                    <Plus className="h-4 w-4" /> Add Account
+                  </Button>
+                ) : null
               }
               className="m-6"
             />
@@ -292,16 +301,22 @@ export default function BankAccountsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(a)}>
-                            <Pencil className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteTarget(a._id ?? a.id)}
-                          >
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                          {canUpdate && (
+                            <DropdownMenuItem onClick={() => openEdit(a)}>
+                              <Pencil className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget(a._id ?? a.id)}
+                              >
+                                <Trash2 className="h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

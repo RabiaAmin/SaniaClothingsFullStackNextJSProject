@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient } from '@/hooks/useClients';
 import { toast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
 
 import PageHeader from '@/components/admin/PageHeader';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
@@ -217,6 +218,10 @@ function ClientDialog({ open, onClose, client, onSaved }) {
 }
 
 export default function ClientsPage() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('client.create');
+  const canUpdate = hasPermission('client.update');
+  const canDelete = hasPermission('client.delete');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -267,9 +272,11 @@ export default function ClientsPage() {
         title="Client Manager"
         description="Manage your client directory"
         action={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Add Client
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Add Client
+            </Button>
+          ) : null
         }
       />
 
@@ -301,9 +308,11 @@ export default function ClientsPage() {
               title="No clients yet"
               description="Add your first client to start creating invoices."
               action={
-                <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> Add Client
-                </Button>
+                canCreate ? (
+                  <Button onClick={openCreate}>
+                    <Plus className="h-4 w-4" /> Add Client
+                  </Button>
+                ) : null
               }
               className="m-6"
             />
@@ -351,16 +360,22 @@ export default function ClientsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(c)}>
-                            <Pencil className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteTarget(c._id)}
-                          >
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                          {canUpdate && (
+                            <DropdownMenuItem onClick={() => openEdit(c)}>
+                              <Pencil className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget(c._id)}
+                              >
+                                <Trash2 className="h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

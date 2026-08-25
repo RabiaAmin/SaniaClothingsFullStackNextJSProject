@@ -16,7 +16,11 @@ export const PROTECTED_PATHS = [
 ];
 
 export const ROUTE_PERMISSIONS = [
+  { path: '/admin/products/create', permission: 'product.create' },
+  { match: /^\/admin\/products\/[^/]+\/edit$/, permission: 'product.update' },
   { path: '/admin/products', permission: 'product.read' },
+  { path: '/invoices/create', permission: 'invoice.create' },
+  { match: /^\/invoices\/[^/]+\/edit$/, permission: 'invoice.update' },
   { path: '/invoices', permission: 'invoice.read' },
   { path: '/production-orders/create', permission: 'production_order.create' },
   { match: /^\/production-orders\/[^/]+\/edit$/, permission: 'production_order.update' },

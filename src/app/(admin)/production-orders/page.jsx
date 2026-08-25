@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useState } from 'react';
 import Link from 'next/link';
-import { ClipboardList, Eye, Pencil, Plus, Search } from 'lucide-react';
+import { ClipboardList, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
 import PermissionGuard from '@/components/auth/PermissionGuard';
 import EmptyState from '@/components/admin/EmptyState';
 import PageHeader from '@/components/admin/PageHeader';
@@ -57,8 +57,33 @@ function ProgressSummary({ order }) {
   );
 }
 
+function invoiceStatusVariant(status) {
+  if (status === 'Paid') return 'success';
+  if (status === 'Pending') return 'warning';
+  return 'default';
+}
+
+function InvoiceRelationship({ relationship }) {
+  if (!relationship || relationship.state === 'NONE') {
+    return <Badge variant="secondary">No invoice</Badge>;
+  }
+  if (relationship.state === 'MULTIPLE') {
+    return <Badge variant="warning">{relationship.matchCount} invoice matches</Badge>;
+  }
+  const invoice = relationship.latestInvoice;
+  return (
+    <div className="space-y-1">
+      <Badge variant={invoiceStatusVariant(invoice?.status)}>{invoice?.status ?? 'Matched'}</Badge>
+      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+        <FileText className="h-3 w-3" /> Invoice {invoice?.invoiceNumber ?? 'matched'}
+      </p>
+    </div>
+  );
+}
+
 export default function ProductionOrdersPage() {
   const { hasPermission } = useAuth();
+  const canReadInvoices = hasPermission('invoice.read');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [clientId, setClientId] = useState('all');
@@ -144,7 +169,7 @@ export default function ProductionOrdersPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6">
-              <TableSkeleton rows={6} cols={8} />
+              <TableSkeleton rows={6} cols={canReadInvoices ? 9 : 8} />
             </div>
           ) : error ? (
             <p className="p-6 text-sm text-destructive">{error.message}</p>
@@ -166,6 +191,7 @@ export default function ProductionOrdersPage() {
                   <TableHead>Rate</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Progress</TableHead>
+                  {canReadInvoices && <TableHead>Invoice</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -187,6 +213,11 @@ export default function ProductionOrdersPage() {
                     <TableCell>
                       <ProgressSummary order={order} />
                     </TableCell>
+                    {canReadInvoices && (
+                      <TableCell>
+                        <InvoiceRelationship relationship={order.invoiceRelationship} />
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button asChild variant="ghost" size="icon">
