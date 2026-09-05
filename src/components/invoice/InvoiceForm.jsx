@@ -38,7 +38,6 @@ export default function InvoiceForm({
   const business = bizRaw?.business ?? null;
 
   const [form, setForm] = useState({
-    invNo: defaultValues?.invNo ?? '',
     poNumber: defaultValues?.poNumber ?? '',
     date: defaultValues?.date?.slice(0, 10) ?? todayISO(),
     toClient: defaultValues?.toClient?._id ?? defaultValues?.toClient ?? '',
@@ -113,7 +112,6 @@ export default function InvoiceForm({
       category: form.category,
       date: form.date,
       status: form.status,
-      ...(form.invNo && { invNo: form.invNo }),
       ...(form.poNumber && { poNumber: form.poNumber }),
     };
 
@@ -189,18 +187,6 @@ export default function InvoiceForm({
             onChange={(e) => set('poNumber', e.target.value)}
             placeholder="PO-2026-001"
             required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>
-            Invoice No{' '}
-            <span className="text-xs text-muted-foreground">(auto-generated if empty)</span>
-          </Label>
-          <Input
-            value={form.invNo}
-            onChange={(e) => set('invNo', e.target.value)}
-            placeholder="INV-0001"
           />
         </div>
 

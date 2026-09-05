@@ -20,7 +20,6 @@ const INVOICE = '/business/invoice';
  * @property {number}        totalAmount   — final total including tax (required)
  * @property {string}        category      — invoice category (required)
  * @property {string}        [date]        — ISO date YYYY-MM-DD, defaults to now
- * @property {string}        [invNo]       — manual invoice number; auto-generated if omitted
  * @property {string}        [poNumber]    — purchase order number
  * @property {number}        [tax]         — tax amount
  * @property {string}        [status]      — "Pending" | "Sent" | "Paid" (default: "Pending")

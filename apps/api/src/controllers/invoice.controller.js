@@ -3,17 +3,7 @@ const Client = require('../models/client.model');
 const BankAccount = require('../models/bankAccount.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { escapeRegex } = require('../utils/query');
-
-const generateInvoiceNumber = async () => {
-  const [last] = await Invoice.aggregate([
-    { $match: { invoiceNumber: { $regex: /^\d+$/ } } },
-    { $addFields: { invoiceNum: { $toInt: '$invoiceNumber' } } },
-    { $sort: { invoiceNum: -1 } },
-    { $limit: 1 },
-  ]);
-
-  return String((last?.invoiceNum ?? 0) + 1);
-};
+const { createInvoiceWithGeneratedNumber } = require('../services/invoiceNumber.service');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
   const {
@@ -33,10 +23,7 @@ exports.createInvoice = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Please provide all required fields' });
   }
 
-  const invoiceNumber = await generateInvoiceNumber();
-
-  const invoice = await Invoice.create({
-    invoiceNumber,
+  const invoice = await createInvoiceWithGeneratedNumber({
     poNumber,
     date: date || Date.now(),
     fromBusiness,
