@@ -126,6 +126,26 @@ test('invoice manager retains access to invoice and client workflows', async ({ 
   await expect(page.getByRole('link', { name: 'Products' })).toHaveCount(0);
 });
 
+test('all invoices table displays backend invoice numbers in the required column order', async ({
+  page,
+}) => {
+  await mockApi(page);
+  await signInAsAdmin(page);
+
+  await page.goto('/invoices');
+
+  await expect(page.getByRole('columnheader')).toHaveText([
+    'Invoice No',
+    'PO Number',
+    'Date',
+    'Total',
+    'Status',
+    'Actions',
+  ]);
+  await expect(page.getByRole('row').filter({ hasText: 'PO-001' }).getByText('1001')).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'PO-002' }).getByText('1002')).toBeVisible();
+});
+
 test('invoice view renders every business detail from the API response', async ({ page }) => {
   await mockApi(page);
   await signInAsAdmin(page);

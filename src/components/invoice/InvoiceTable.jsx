@@ -140,7 +140,7 @@ export default function InvoiceTable({
     return (
       <Card>
         <CardContent className="p-6">
-          <TableSkeleton rows={6} cols={5} />
+          <TableSkeleton rows={6} cols={6} />
         </CardContent>
       </Card>
     );
@@ -184,6 +184,7 @@ export default function InvoiceTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Invoice No</TableHead>
               <TableHead>PO Number</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-right">Total</TableHead>
@@ -194,6 +195,9 @@ export default function InvoiceTable({
           <TableBody>
             {invoices.map((inv) => (
               <TableRow key={inv._id}>
+                <TableCell className="font-medium tabular-nums">
+                  {inv.invoiceNumber ?? '—'}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {inv.poNumber ?? '—'}
                 </TableCell>
