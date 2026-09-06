@@ -23,6 +23,7 @@ function today() {
 function initialForm(order) {
   return {
     poNumber: order?.poNumber ?? '',
+    itemCode: order?.itemCode ?? '',
     clientId: order?.client?._id ?? order?.client ?? '',
     productId: order?.product?._id ?? order?.product ?? 'none',
     productionDescription: order?.productionDescription ?? '',
@@ -69,6 +70,7 @@ export default function ProductionOrderForm({
     event.preventDefault();
     if (
       !form.poNumber.trim() ||
+      !form.itemCode.trim() ||
       !form.clientId ||
       !form.productionDescription.trim() ||
       !form.startDate ||
@@ -94,6 +96,7 @@ export default function ProductionOrderForm({
       ...form,
       productId: form.productId === 'none' ? null : form.productId,
       poNumber: form.poNumber.trim(),
+      itemCode: form.itemCode.trim(),
       productionDescription: form.productionDescription.trim(),
       orderedQuantity: Number(form.orderedQuantity),
       workerRate: Number(form.workerRate),
@@ -116,6 +119,16 @@ export default function ProductionOrderForm({
             <p className="text-xs text-muted-foreground">
               PO numbers are unique and stored in uppercase.
             </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="itemCode">Item Code *</Label>
+            <Input
+              id="itemCode"
+              value={form.itemCode}
+              onChange={(event) => updateField('itemCode', event.target.value)}
+              placeholder="JK001"
+            />
+            <p className="text-xs text-muted-foreground">Item codes are stored in uppercase.</p>
           </div>
           <div className="space-y-1.5">
             <Label>Client *</Label>

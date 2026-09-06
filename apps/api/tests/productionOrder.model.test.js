@@ -8,6 +8,7 @@ function validOrder(overrides = {}) {
   const userId = new mongoose.Types.ObjectId();
   return new ProductionOrder({
     poNumber: 'po-2026-001',
+    itemCode: 'jk001',
     client: new mongoose.Types.ObjectId(),
     productionDescription: 'Navy work jackets',
     orderedQuantity: 120,
@@ -26,10 +27,16 @@ test('production orders normalize globally unique PO keys and expose progress', 
   await order.validate();
 
   assert.equal(order.poNumber, 'PO-2026-001');
+  assert.equal(order.itemCode, 'JK001');
   assert.equal(order.producedQuantity, 80);
   assert.equal(order.remainingQuantity, 40);
   assert.equal(order.progressPercentage, 67);
   assert.equal(ProductionOrder.schema.path('poNumber').options.unique, true);
+});
+
+test('production orders require an item code', async () => {
+  const order = validOrder({ itemCode: '   ' });
+  await assert.rejects(() => order.validate(), /item code is required/i);
 });
 
 test('approved production cannot exceed the ordered quantity', async () => {

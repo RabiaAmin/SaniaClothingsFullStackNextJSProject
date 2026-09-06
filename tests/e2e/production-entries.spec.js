@@ -26,7 +26,7 @@ test('worker submits production for themselves with a server-owned rate snapshot
   await expect(page.getByRole('heading', { name: 'Production Entries' })).toBeVisible();
   await page.getByRole('button', { name: 'Record Production' }).click();
   await page.getByRole('combobox').nth(0).click();
-  await page.getByRole('option', { name: /PO-2026-001/ }).click();
+  await page.getByRole('option', { name: 'PO-2026-001 - JK001' }).click();
   await expect(page.getByText(/12\.50 per piece/)).toBeVisible();
   await page.getByLabel('Production date *').fill('2026-08-23');
   await page.getByLabel('Pieces produced *').fill('20');
@@ -51,6 +51,18 @@ test('worker submits production for themselves with a server-owned rate snapshot
   expect(payload.workerId).toBeUndefined();
   expect(payload.unitRate).toBeUndefined();
   expect(payload.totalAmount).toBeUndefined();
+});
+
+test('record production handles an older order without an item code', async ({ page }) => {
+  await mockApi(page, { user: workerUser, includeLegacyProductionOrder: true });
+  await signInAsAdmin(page);
+  await page.goto('/production-entries');
+
+  await page.getByRole('button', { name: 'Record Production' }).click();
+  await page.getByRole('combobox').nth(0).click();
+  await expect(
+    page.getByRole('option', { name: 'PO-LEGACY-001 - Item code unavailable' })
+  ).toBeVisible();
 });
 
 test('worker sees only their own pending entry and cannot approve it', async ({ page }) => {

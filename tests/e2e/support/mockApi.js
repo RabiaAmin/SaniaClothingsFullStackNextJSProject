@@ -202,6 +202,7 @@ const roles = [
 const productionOrder = {
   _id: 'production-order-1',
   poNumber: 'PO-2026-001',
+  itemCode: 'JK001',
   client: { _id: 'client-1', name: 'Acme Retail', email: 'buyer@acme.test' },
   product: { _id: 'prod-1', name: 'Denim Work Jacket', category: 'Jackets' },
   productionDescription: 'Navy work jackets for winter delivery',
@@ -488,18 +489,29 @@ async function mockApi(page, options = {}) {
     }
 
     if (method === 'GET' && path === '/production-orders') {
+      const productionOrders = [
+        {
+          ...productionOrder,
+          approvedQuantity: currentApprovedQuantity,
+          invoiceRelationship,
+        },
+        ...(options.includeLegacyProductionOrder
+          ? [
+              {
+                ...productionOrder,
+                _id: 'production-order-legacy',
+                poNumber: 'PO-LEGACY-001',
+                itemCode: undefined,
+              },
+            ]
+          : []),
+      ];
       return response(route, {
         success: true,
-        productionOrders: [
-          {
-            ...productionOrder,
-            approvedQuantity: currentApprovedQuantity,
-            invoiceRelationship,
-          },
-        ],
+        productionOrders,
         page: 1,
         totalPages: 1,
-        totalRecords: 1,
+        totalRecords: productionOrders.length,
       });
     }
     if (method === 'POST' && path === '/production-orders') {
@@ -522,7 +534,11 @@ async function mockApi(page, options = {}) {
       });
     }
     if (method === 'PUT' && path.startsWith('/production-orders/')) {
-      return response(route, { success: true, productionOrder });
+      const payload = await readPayload(route);
+      return response(route, {
+        success: true,
+        productionOrder: { ...productionOrder, ...payload },
+      });
     }
     if (method === 'PATCH' && path.endsWith('/status')) {
       const payload = await readPayload(route);

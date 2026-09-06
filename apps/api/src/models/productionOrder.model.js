@@ -12,6 +12,13 @@ const productionOrderSchema = new mongoose.Schema(
       uppercase: true,
       maxlength: [80, 'PO number cannot exceed 80 characters'],
     },
+    itemCode: {
+      type: String,
+      required: [true, 'Item code is required'],
+      trim: true,
+      uppercase: true,
+      maxlength: [80, 'Item code cannot exceed 80 characters'],
+    },
     client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
     productionDescription: {

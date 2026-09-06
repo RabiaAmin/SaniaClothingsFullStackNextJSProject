@@ -73,6 +73,7 @@
  * @typedef {Object} ProductionOrder
  * @property {string} _id
  * @property {string} poNumber
+ * @property {string} [itemCode] Required for new orders; older records may not have one.
  * @property {Client} client
  * @property {Object|null} product
  * @property {string} productionDescription

@@ -129,7 +129,7 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
                     .filter((order) => !['COMPLETED', 'CANCELLED'].includes(order.status))
                     .map((order) => (
                       <SelectItem key={order._id} value={order._id}>
-                        {order.poNumber} — {order.productionDescription}
+                        {order.poNumber} - {order.itemCode || 'Item code unavailable'}
                       </SelectItem>
                     ))}
                 </SelectContent>

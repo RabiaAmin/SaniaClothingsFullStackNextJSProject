@@ -204,6 +204,10 @@ export default function ProductionOrderDetailPage() {
           </CardHeader>
           <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
             <div>
+              <p className="text-muted-foreground">Item code</p>
+              <p className="font-mono font-medium">{order.itemCode || 'Not assigned'}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground">Client</p>
               <p className="font-medium">{order.client?.name ?? 'Unknown client'}</p>
             </div>

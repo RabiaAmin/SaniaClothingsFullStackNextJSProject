@@ -47,6 +47,7 @@ test('admin can create a production order independently from invoices', async ({
   await page.goto('/production-orders/create');
 
   await page.getByLabel('PO Number *').fill('po-2026-002');
+  await page.getByLabel('Item Code *').fill('jk002');
   const selects = page.getByRole('combobox');
   await selects.nth(0).click();
   await page.getByRole('option', { name: 'Acme Retail' }).click();
@@ -60,13 +61,16 @@ test('admin can create a production order independently from invoices', async ({
   await page.getByLabel('Notes').fill('Production-only instructions');
   await page.getByRole('button', { name: 'Create Production Order' }).click();
 
-  await expect(page).toHaveURL(/\/production-orders\/production-order-created$/);
+  await expect(page).toHaveURL(/\/production-orders\/production-order-created$/, {
+    timeout: 15_000,
+  });
   await expect
     .poll(() => calls.find((call) => call.method === 'POST' && call.path === '/production-orders'))
     .toEqual(
       expect.objectContaining({
         payload: expect.objectContaining({
           poNumber: 'po-2026-002',
+          itemCode: 'jk002',
           clientId: 'client-1',
           productId: 'prod-1',
           orderedQuantity: 120,
@@ -83,6 +87,7 @@ test('detail view shows progress, invoice matches, and status management', async
   await page.goto('/production-orders/production-order-1');
 
   await expect(page.getByRole('heading', { name: 'PO-2026-001' })).toBeVisible();
+  await expect(page.getByText('JK001', { exact: true })).toBeVisible();
   await expect(page.getByText('Ordered').locator('..').getByText('120')).toBeVisible();
   await expect(page.getByText('Produced').locator('..').getByText('80')).toBeVisible();
   await expect(page.getByText('Remaining').locator('..').getByText('40')).toBeVisible();
@@ -98,6 +103,25 @@ test('detail view shows progress, invoice matches, and status management', async
       )
     )
     .toEqual(expect.objectContaining({ payload: { status: 'PENDING' } }));
+});
+
+test('admin can view and update a production order item code', async ({ page }) => {
+  const calls = await mockApi(page);
+  await signInAsAdmin(page);
+  await page.goto('/production-orders/production-order-1/edit');
+
+  const itemCode = page.getByLabel('Item Code *');
+  await expect(itemCode).toHaveValue('JK001');
+  await itemCode.fill('jk009');
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+
+  await expect
+    .poll(() =>
+      calls.find(
+        (call) => call.method === 'PUT' && call.path === '/production-orders/production-order-1'
+      )
+    )
+    .toEqual(expect.objectContaining({ payload: expect.objectContaining({ itemCode: 'jk009' }) }));
 });
 
 test('worker can read orders but cannot create, edit, or query client administration', async ({

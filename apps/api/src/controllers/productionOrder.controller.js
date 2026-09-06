@@ -39,6 +39,10 @@ function isValidStatus(value) {
   return PRODUCTION_ORDER_STATUSES.includes(value);
 }
 
+function normalizeItemCode(value) {
+  return typeof value === 'string' ? value.trim().toUpperCase() : '';
+}
+
 async function validateReferences(clientId, productId) {
   if (!mongoose.isValidObjectId(clientId) || (productId && !mongoose.isValidObjectId(productId))) {
     return { error: 'Invalid client or product identifier' };
@@ -55,6 +59,7 @@ async function validateReferences(clientId, productId) {
 exports.createProductionOrder = asyncHandler(async (req, res) => {
   const {
     poNumber,
+    itemCode,
     clientId,
     productId,
     productionDescription,
@@ -67,9 +72,10 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
   } = req.body;
 
   const normalizedPoNumber = normalizePoNumber(poNumber);
+  const normalizedItemCode = normalizeItemCode(itemCode);
   const parsedQuantity = parsePositiveInteger(orderedQuantity);
   const parsedRate = parseNonNegativeNumber(workerRate);
-  if (!normalizedPoNumber || !clientId || !startDate || !dueDate) {
+  if (!normalizedPoNumber || !normalizedItemCode || !clientId || !startDate || !dueDate) {
     return res.status(400).json({ success: false, message: 'Please provide all required fields' });
   }
   if (!isValidDate(startDate) || !isValidDate(dueDate) || new Date(dueDate) < new Date(startDate)) {
@@ -106,6 +112,7 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
 
   const productionOrder = await ProductionOrder.create({
     poNumber: normalizedPoNumber,
+    itemCode: normalizedItemCode,
     client: clientId,
     product: productId || null,
     productionDescription: description,
@@ -134,7 +141,7 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
 
   if (req.query.search?.trim()) {
     const search = new RegExp(escapeRegex(req.query.search.trim()), 'i');
-    filter.$or = [{ poNumber: search }, { productionDescription: search }];
+    filter.$or = [{ poNumber: search }, { itemCode: search }, { productionDescription: search }];
   }
   if (req.query.status) {
     if (!isValidStatus(req.query.status)) {
@@ -215,6 +222,14 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
     productionOrder.poNumber = poNumber;
   }
 
+  if (req.body.itemCode !== undefined) {
+    const itemCode = normalizeItemCode(req.body.itemCode);
+    if (!itemCode) {
+      return res.status(400).json({ success: false, message: 'Item code is required' });
+    }
+    productionOrder.itemCode = itemCode;
+  }
+
   const nextClientId = req.body.clientId ?? productionOrder.client;
   const nextProductId =
     req.body.productId === undefined ? productionOrder.product : req.body.productId;
@@ -276,7 +291,7 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid production order status' });
   }
   productionOrder.updatedBy = req.user._id;
-  await productionOrder.save();
+  await productionOrder.save({ validateModifiedOnly: true });
   await productionOrder.populate(POPULATE_FIELDS);
 
   res.status(200).json({
@@ -297,7 +312,7 @@ exports.updateProductionOrderStatus = asyncHandler(async (req, res) => {
   }
   productionOrder.status = req.body.status;
   productionOrder.updatedBy = req.user._id;
-  await productionOrder.save();
+  await productionOrder.save({ validateModifiedOnly: true });
   await productionOrder.populate(POPULATE_FIELDS);
   res.status(200).json({
     success: true,
