@@ -34,6 +34,13 @@ async function submitProductionEntry({
   if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
     throw new ProductionEntryError('Production cannot be recorded against a closed order', 409);
   }
+  const assignedWorkerIds = (order.assignedWorkers ?? []).map(String);
+  if (assignedWorkerIds.length > 0 && !assignedWorkerIds.includes(String(workerId))) {
+    throw new ProductionEntryError(
+      'You are not assigned to this production order and cannot record production against it',
+      403
+    );
+  }
   if (quantity > order.orderedQuantity) {
     throw new ProductionEntryError(
       'An entry quantity cannot exceed the production order quantity',

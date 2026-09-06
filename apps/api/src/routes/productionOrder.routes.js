@@ -6,6 +6,13 @@ const productionOrderController = require('../controllers/productionOrder.contro
 const router = express.Router();
 
 router.get(
+  '/eligible-workers',
+  protect,
+  authorize('production_order.assign'),
+  productionOrderController.getAssignableWorkers
+);
+
+router.get(
   '/',
   protect,
   authorize('production_order.read'),

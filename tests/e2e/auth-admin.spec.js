@@ -68,7 +68,7 @@ test('signed-in admin feature pages render with mocked data', async ({ page }) =
     ['/invoices', 'Invoice Manager'],
     ['/production-orders', 'Production Orders'],
     ['/production-entries', 'Production Entries'],
-    ['/payroll', 'Monthly Payroll'],
+    ['/payroll', 'Payroll'],
     ['/invoices/create', 'Create Invoice'],
     ['/invoices/statements', 'Invoice Statements'],
     ['/clients', 'Client Manager'],

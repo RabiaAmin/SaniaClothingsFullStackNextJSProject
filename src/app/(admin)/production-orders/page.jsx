@@ -2,7 +2,16 @@
 
 import { useDeferredValue, useState } from 'react';
 import Link from 'next/link';
-import { ClipboardList, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
+import {
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+  Eye,
+  FileText,
+  Pencil,
+  Plus,
+  Search,
+} from 'lucide-react';
 import PermissionGuard from '@/components/auth/PermissionGuard';
 import EmptyState from '@/components/admin/EmptyState';
 import PageHeader from '@/components/admin/PageHeader';
@@ -32,28 +41,63 @@ import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import {
   PRODUCTION_ORDER_STATUSES,
+  productionOrderProgressColor,
   productionOrderStatusLabel,
   productionOrderStatusVariant,
+  productionOrderTracking,
 } from '@/lib/productionOrders';
 
 function ProgressSummary({ order }) {
-  const produced = order.approvedQuantity ?? order.producedQuantity ?? 0;
-  const remaining = Math.max(0, order.orderedQuantity - produced);
-  const percentage = order.orderedQuantity
-    ? Math.round((produced / order.orderedQuantity) * 100)
-    : 0;
+  const tracking = productionOrderTracking(order);
 
   return (
     <div className="min-w-44 space-y-1.5">
       <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
+        <div
+          className={`h-full rounded-full ${productionOrderProgressColor(order)}`}
+          style={{ width: `${tracking.progressPercentage}%` }}
+        />
       </div>
-      <div className="flex gap-3 text-[11px] text-muted-foreground">
-        <span>Ordered: {order.orderedQuantity}</span>
-        <span>Produced: {produced}</span>
-        <span>Remaining: {remaining}</span>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span>
+          {tracking.producedQuantity} / {tracking.orderedQuantity} produced
+        </span>
+        <span>{tracking.remainingQuantity} remaining</span>
       </div>
     </div>
+  );
+}
+
+function DeadlineSummary({ order }) {
+  const tracking = productionOrderTracking(order);
+  if (!tracking.productionDeadline)
+    return <span className="text-muted-foreground">Unavailable</span>;
+
+  const warningClass =
+    tracking.deadlineStatus === 'OVERDUE'
+      ? 'text-destructive'
+      : tracking.deadlineStatus === 'DUE_SOON'
+        ? 'text-yellow-700 dark:text-yellow-300'
+        : '';
+
+  return (
+    <div className={`space-y-1 ${warningClass}`}>
+      <span className="flex items-center gap-1 font-medium">
+        <Clock3 className="h-3.5 w-3.5" /> {formatDate(tracking.productionDeadline)}
+      </span>
+      {tracking.deadlineStatus === 'DUE_SOON' && <p className="text-xs">Due soon</p>}
+      {tracking.deadlineStatus === 'OVERDUE' && <p className="text-xs">Overdue</p>}
+    </div>
+  );
+}
+
+function ProductionStatus({ order }) {
+  const tracking = productionOrderTracking(order);
+  return (
+    <Badge variant={productionOrderStatusVariant(tracking.status)} className="gap-1">
+      {tracking.status === 'COMPLETED' && <CheckCircle2 className="h-3.5 w-3.5" />}
+      {productionOrderStatusLabel(tracking.status)}
+    </Badge>
   );
 }
 
@@ -187,7 +231,7 @@ export default function ProductionOrdersPage() {
                   <TableHead>PO Number</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Due</TableHead>
+                  <TableHead>Production deadline</TableHead>
                   <TableHead>Rate</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Progress</TableHead>
@@ -203,12 +247,12 @@ export default function ProductionOrdersPage() {
                     <TableCell className="max-w-64 truncate">
                       {order.productionDescription}
                     </TableCell>
-                    <TableCell>{formatDate(order.dueDate)}</TableCell>
+                    <TableCell>
+                      <DeadlineSummary order={order} />
+                    </TableCell>
                     <TableCell>{formatCurrency(order.workerRate)}</TableCell>
                     <TableCell>
-                      <Badge variant={productionOrderStatusVariant(order.status)}>
-                        {productionOrderStatusLabel(order.status)}
-                      </Badge>
+                      <ProductionStatus order={order} />
                     </TableCell>
                     <TableCell>
                       <ProgressSummary order={order} />

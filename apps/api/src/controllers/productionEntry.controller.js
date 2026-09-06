@@ -12,7 +12,7 @@ const POPULATE_FIELDS = [
   {
     path: 'productionOrder',
     select:
-      'poNumber itemCode productionDescription orderedQuantity approvedQuantity workerRate status client',
+      'poNumber itemCode assignedWorkers productionDescription orderedQuantity approvedQuantity workerRate status client',
     populate: { path: 'client', select: 'name' },
   },
   { path: 'worker', select: 'username email' },

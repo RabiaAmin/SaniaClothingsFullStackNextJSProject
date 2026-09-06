@@ -1,8 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { getMonthRange, buildMonthlyPayrollReport } = require('../src/services/payroll.service');
+const ProductionEntry = require('../src/models/productionEntry.model');
+const {
+  getDateRange,
+  getMonthRange,
+  buildPayrollReport,
+  getPayrollReport,
+} = require('../src/services/payroll.service');
 
-const period = getMonthRange(2026, 8);
+const period = getDateRange('2026-08-26', '2026-09-27');
 const worker = { _id: 'worker-1', username: 'worker-one', email: 'worker@sania.test' };
 
 function entry(overrides = {}) {
@@ -24,8 +30,8 @@ function entry(overrides = {}) {
   };
 }
 
-test('monthly payroll totals approved entries using their historical rate snapshots', () => {
-  const report = buildMonthlyPayrollReport(
+test('payroll totals approved entries using their historical rate snapshots', () => {
+  const report = buildPayrollReport(
     [
       entry(),
       entry({
@@ -64,7 +70,7 @@ test('monthly payroll totals approved entries using their historical rate snapsh
 });
 
 test('pending and rejected entries never contribute to payroll', () => {
-  const report = buildMonthlyPayrollReport(
+  const report = buildPayrollReport(
     [
       entry({ _id: 'pending', status: 'PENDING', quantity: 1000 }),
       entry({ _id: 'rejected', status: 'REJECTED', quantity: 1000 }),
@@ -83,7 +89,7 @@ test('pending and rejected entries never contribute to payroll', () => {
 
 test('the same approved production entry cannot be counted twice', () => {
   const approvedEntry = entry();
-  const report = buildMonthlyPayrollReport([approvedEntry, { ...approvedEntry }], period);
+  const report = buildPayrollReport([approvedEntry, { ...approvedEntry }], period);
 
   assert.equal(report.summary.entryCount, 1);
   assert.equal(report.summary.totalApprovedPieces, 40);
@@ -97,4 +103,81 @@ test('month ranges use an inclusive UTC start and exclusive next-month boundary'
   assert.equal(getMonthRange(2026, 0), null);
   assert.equal(getMonthRange(2026, 13), null);
   assert.equal(getMonthRange('invalid', 8), null);
+});
+
+test('custom ranges include both UTC boundary dates and exclude outside entries', async () => {
+  const originalFind = ProductionEntry.find;
+  const secondWorker = {
+    _id: 'worker-2',
+    username: 'worker-two',
+    email: 'worker2@sania.test',
+  };
+  const entries = [
+    entry({ _id: 'start', date: new Date('2026-08-26T00:00:00.000Z') }),
+    entry({
+      _id: 'end',
+      worker: secondWorker,
+      date: new Date('2026-09-27T23:59:59.999Z'),
+      quantity: 20,
+      unitRate: 10,
+    }),
+    entry({ _id: 'before', date: new Date('2026-08-25T23:59:59.999Z') }),
+    entry({ _id: 'after', date: new Date('2026-09-28T00:00:00.000Z') }),
+    entry({ _id: 'pending', date: new Date('2026-09-01T00:00:00.000Z'), status: 'PENDING' }),
+  ];
+  let capturedFilter;
+  ProductionEntry.find = (filter) => {
+    capturedFilter = filter;
+    return {
+      select() {
+        return this;
+      },
+      populate() {
+        return this;
+      },
+      sort() {
+        return this;
+      },
+      lean: async () =>
+        entries.filter(
+          (item) =>
+            item.status === filter.status &&
+            item.date >= filter.date.$gte &&
+            item.date < filter.date.$lt
+        ),
+    };
+  };
+
+  try {
+    const report = await getPayrollReport({
+      startDate: '2026-08-26',
+      endDate: '2026-09-27',
+    });
+
+    assert.equal(capturedFilter.date.$gte.toISOString(), '2026-08-26T00:00:00.000Z');
+    assert.equal(capturedFilter.date.$lt.toISOString(), '2026-09-28T00:00:00.000Z');
+    assert.equal(report.summary.workerCount, 2);
+    assert.equal(report.summary.entryCount, 2);
+    assert.equal(report.summary.totalApprovedPieces, 60);
+    assert.equal(report.summary.totalEarnings, 800);
+    assert.deepEqual(
+      report.workers.flatMap((item) =>
+        item.entries.map((auditEntry) => auditEntry.productionEntryId)
+      ),
+      ['start', 'end']
+    );
+  } finally {
+    ProductionEntry.find = originalFind;
+  }
+});
+
+test('custom date ranges reject invalid ordering and support a single day', () => {
+  assert.equal(getDateRange('2026-09-28', '2026-09-27'), null);
+  assert.equal(getDateRange('2026-02-30', '2026-03-01'), null);
+  assert.equal(getDateRange('', '2026-09-27'), null);
+
+  const sameDay = getDateRange('2026-09-27', '2026-09-27');
+  assert.equal(sameDay.start.toISOString(), '2026-09-27T00:00:00.000Z');
+  assert.equal(sameDay.end.toISOString(), '2026-09-27T00:00:00.000Z');
+  assert.equal(sameDay.endExclusive.toISOString(), '2026-09-28T00:00:00.000Z');
 });

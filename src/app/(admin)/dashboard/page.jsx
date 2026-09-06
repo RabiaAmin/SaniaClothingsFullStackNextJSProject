@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  AlertTriangle,
   Banknote,
   Bell,
   CheckCircle2,
@@ -34,20 +35,31 @@ import { useAuth } from '@/hooks/useAuth';
 import { useClients } from '@/hooks/useClients';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useNotifications } from '@/hooks/useNotifications';
-import { useMonthlyPayroll } from '@/hooks/usePayroll';
+import { usePayroll } from '@/hooks/usePayroll';
 import { useProductionEntries } from '@/hooks/useProductionEntries';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { notificationTarget, notificationTypeLabel } from '@/lib/notifications';
 import { productionEntryStatusLabel, productionEntryStatusVariant } from '@/lib/productionEntries';
-import { productionOrderStatusLabel, productionOrderStatusVariant } from '@/lib/productionOrders';
+import {
+  productionOrderProgressColor,
+  productionOrderStatusLabel,
+  productionOrderStatusVariant,
+  productionOrderTracking,
+} from '@/lib/productionOrders';
 import { formatCurrency, formatDate, formatRelativeTime } from '@/lib/utils/formatters';
 
 function monthParams() {
   const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const dateInputValue = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+      date.getDate()
+    ).padStart(2, '0')}`;
   return {
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
-    dateFrom: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+    startDate: dateInputValue(start),
+    endDate: dateInputValue(end),
+    dateFrom: start.toISOString(),
     dateTo: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(),
   };
 }
@@ -95,19 +107,49 @@ function ErrorMessage({ queries }) {
 }
 
 function OrderProgress({ order }) {
-  const produced = order.approvedQuantity ?? order.producedQuantity ?? 0;
-  const percent = order.orderedQuantity
-    ? Math.min(100, Math.round((produced / order.orderedQuantity) * 100))
-    : 0;
+  const tracking = productionOrderTracking(order);
   return (
     <div className="min-w-36 space-y-1.5">
       <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+        <div
+          className={`h-full rounded-full ${productionOrderProgressColor(order)}`}
+          style={{ width: `${tracking.progressPercentage}%` }}
+        />
       </div>
       <p className="text-xs text-muted-foreground">
-        {produced} / {order.orderedQuantity} pieces
+        {tracking.producedQuantity} / {tracking.orderedQuantity} pieces ·{' '}
+        {tracking.remainingQuantity} remaining
       </p>
     </div>
+  );
+}
+
+function OrderStatus({ order }) {
+  const tracking = productionOrderTracking(order);
+  return (
+    <Badge variant={productionOrderStatusVariant(tracking.status)} className="gap-1">
+      {tracking.status === 'COMPLETED' && <CheckCircle2 className="h-3.5 w-3.5" />}
+      {productionOrderStatusLabel(tracking.status)}
+    </Badge>
+  );
+}
+
+function OrderDeadline({ order, includeWarning = false }) {
+  const tracking = productionOrderTracking(order);
+  if (!tracking.productionDeadline)
+    return <span className="text-muted-foreground">Unavailable</span>;
+  const className =
+    tracking.deadlineStatus === 'OVERDUE'
+      ? 'text-destructive'
+      : tracking.deadlineStatus === 'DUE_SOON'
+        ? 'text-yellow-700 dark:text-yellow-300'
+        : 'text-muted-foreground';
+  return (
+    <span className={`text-xs ${className}`}>
+      Deadline {formatDate(tracking.productionDeadline)}
+      {includeWarning && tracking.deadlineStatus === 'DUE_SOON' ? ' · Due soon' : ''}
+      {includeWarning && tracking.deadlineStatus === 'OVERDUE' ? ' · Overdue' : ''}
+    </span>
   );
 }
 
@@ -226,10 +268,16 @@ function InvoicePanel({ query, clients, canCreate }) {
 
 function ProductionPanel({ ordersQuery, pendingQuery, payrollQuery, canReview }) {
   const orders = ordersQuery.data?.productionOrders ?? [];
-  const active = orders.filter((order) => !['COMPLETED', 'CANCELLED'].includes(order.status));
-  const produced = orders.reduce((sum, order) => sum + (order.approvedQuantity ?? 0), 0);
+  const active = orders.filter(
+    (order) => !['COMPLETED', 'CANCELLED'].includes(productionOrderTracking(order).status)
+  );
+  const alerts = active.filter((order) => productionOrderTracking(order).deadlineStatus);
+  const produced = orders.reduce(
+    (sum, order) => sum + productionOrderTracking(order).producedQuantity,
+    0
+  );
   const remaining = active.reduce(
-    (sum, order) => sum + Math.max(0, order.orderedQuantity - (order.approvedQuantity ?? 0)),
+    (sum, order) => sum + productionOrderTracking(order).remainingQuantity,
     0
   );
   const pending = pendingQuery.data?.productionEntries ?? [];
@@ -247,7 +295,7 @@ function ProductionPanel({ ordersQuery, pendingQuery, payrollQuery, canReview })
         <Stat
           label="Active orders"
           value={ordersQuery.isLoading ? '—' : active.length}
-          description={`${orders.filter((order) => order.status === 'COMPLETED').length} completed`}
+          description={`${orders.filter((order) => productionOrderTracking(order).status === 'COMPLETED').length} completed`}
           icon={ClipboardList}
         />
         <Stat
@@ -270,6 +318,49 @@ function ProductionPanel({ ordersQuery, pendingQuery, payrollQuery, canReview })
           icon={Clock3}
         />
       </div>
+      <Card data-testid="production-alerts">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-4 w-4" /> Production alerts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {ordersQuery.isLoading ? (
+            <div className="h-20 animate-pulse rounded-lg bg-muted" />
+          ) : alerts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No production deadlines need attention.</p>
+          ) : (
+            alerts.map((order) => {
+              const tracking = productionOrderTracking(order);
+              const overdue = tracking.deadlineStatus === 'OVERDUE';
+              return (
+                <Link
+                  key={order._id}
+                  href={`/production-orders/${order._id}`}
+                  className={`flex flex-col gap-2 rounded-lg border p-3 hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between ${
+                    overdue
+                      ? 'border-destructive/40 bg-destructive/5'
+                      : 'border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/30'
+                  }`}
+                >
+                  <span>
+                    <span className="block font-mono text-sm font-semibold">
+                      {order.poNumber} · {order.itemCode || 'Item code unavailable'}
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {tracking.remainingQuantity} pieces remaining ·{' '}
+                      {formatDate(tracking.productionDeadline)} production deadline
+                    </span>
+                  </span>
+                  <Badge variant={overdue ? 'destructive' : 'warning'}>
+                    {overdue ? 'Overdue' : 'Due soon'}
+                  </Badge>
+                </Link>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
       {payroll && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Stat
@@ -328,9 +419,7 @@ function ProductionPanel({ ordersQuery, pendingQuery, payrollQuery, canReview })
                         <OrderProgress order={order} />
                       </TableCell>
                       <TableCell>
-                        <Badge variant={productionOrderStatusVariant(order.status)}>
-                          {productionOrderStatusLabel(order.status)}
-                        </Badge>
+                        <OrderStatus order={order} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -378,12 +467,60 @@ function ProductionPanel({ ordersQuery, pendingQuery, payrollQuery, canReview })
   );
 }
 
-function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQuery }) {
+function WorkerOrdersCard({ title, orders, isLoading, emptyMessage }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">{title}</CardTitle>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/production-orders">View all</Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <div className="h-32 animate-pulse rounded-lg bg-muted" />
+        ) : orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          orders.slice(0, 4).map((order) => (
+            <Link
+              key={order._id}
+              href={`/production-orders/${order._id}`}
+              className="block rounded-lg border p-3 hover:bg-muted/50"
+            >
+              <div className="flex justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-sm font-semibold">{order.poNumber}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {order.itemCode || 'Item code unavailable'}
+                  </p>
+                </div>
+                <OrderStatus order={order} />
+              </div>
+              <div className="mt-3">
+                <OrderProgress order={order} />
+                <p className="mt-2">
+                  <OrderDeadline order={order} includeWarning />
+                </p>
+              </div>
+            </Link>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQuery, userId }) {
   const entries = entriesQuery.data?.productionEntries ?? [];
   const stats = entriesQuery.data?.stats ?? {};
-  const orders = (ordersQuery.data?.productionOrders ?? []).filter((order) =>
-    ['PENDING', 'IN_PROGRESS'].includes(order.status)
+  const orders = (ordersQuery.data?.productionOrders ?? []).filter(
+    (order) => !['COMPLETED', 'CANCELLED'].includes(productionOrderTracking(order).status)
   );
+  const assignedOrders = orders.filter((order) =>
+    (order.assignedWorkers ?? []).some((worker) => String(worker?._id ?? worker) === String(userId))
+  );
+  const availableOrders = orders.filter((order) => (order.assignedWorkers ?? []).length === 0);
   const notifications = notificationsQuery.data?.notifications ?? [];
   const estimated = entries
     .filter((entry) => entry.status === 'PENDING')
@@ -489,45 +626,19 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
           )}
         </CardContent>
       </Card>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Available production orders</CardTitle>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/production-orders">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {ordersQuery.isLoading ? (
-              <div className="h-32 animate-pulse rounded-lg bg-muted" />
-            ) : orders.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No production orders are available.</p>
-            ) : (
-              orders.slice(0, 4).map((order) => (
-                <Link
-                  key={order._id}
-                  href={`/production-orders/${order._id}`}
-                  className="block rounded-lg border p-3 hover:bg-muted/50"
-                >
-                  <div className="flex justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-mono text-sm font-semibold">{order.poNumber}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {order.productionDescription}
-                      </p>
-                    </div>
-                    <Badge variant={productionOrderStatusVariant(order.status)}>
-                      {productionOrderStatusLabel(order.status)}
-                    </Badge>
-                  </div>
-                  <div className="mt-3">
-                    <OrderProgress order={order} />
-                  </div>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 xl:grid-cols-3">
+        <WorkerOrdersCard
+          title="My Assigned Orders"
+          orders={assignedOrders}
+          isLoading={ordersQuery.isLoading}
+          emptyMessage="No production orders are assigned to you."
+        />
+        <WorkerOrdersCard
+          title="Available production orders"
+          orders={availableOrders}
+          isLoading={ordersQuery.isLoading}
+          emptyMessage="No unassigned production orders are available."
+        />
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -599,8 +710,8 @@ export default function DashboardPage() {
     { page: 1, limit: 5, status: 'PENDING' },
     { enabled: review }
   );
-  const payroll = useMonthlyPayroll(
-    { year: period.year, month: period.month },
+  const payroll = usePayroll(
+    { startDate: period.startDate, endDate: period.endDate },
     { enabled: payrollRead }
   );
   const notifications = useNotifications(
@@ -670,6 +781,7 @@ export default function DashboardPage() {
           ordersQuery={orders}
           payrollQuery={payroll}
           notificationsQuery={notifications}
+          userId={user?._id}
         />
       )}
       {!invoiceRead && !productionView && !workerView && (

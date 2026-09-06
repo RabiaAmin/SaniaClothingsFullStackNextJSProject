@@ -23,12 +23,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { useCreateProductionEntry, useUpdateProductionEntry } from '@/hooks/useProductionEntries';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ProductionEntryFormDialog({ open, onOpenChange, entry = null }) {
+  const { user } = useAuth();
   const isEditing = Boolean(entry);
   const [productionOrderId, setProductionOrderId] = useState('');
   const [date, setDate] = useState(today());
@@ -39,6 +41,17 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
   const updateEntry = useUpdateProductionEntry();
   const mutation = isEditing ? updateEntry : createEntry;
   const orders = useMemo(() => orderData?.productionOrders ?? [], [orderData?.productionOrders]);
+  const availableOrders = useMemo(
+    () =>
+      orders.filter((order) => {
+        if (['COMPLETED', 'CANCELLED'].includes(order.status)) return false;
+        const assignedWorkerIds = (order.assignedWorkers ?? []).map((worker) =>
+          String(worker?._id ?? worker)
+        );
+        return assignedWorkerIds.length === 0 || assignedWorkerIds.includes(String(user?._id));
+      }),
+    [orders, user?._id]
+  );
   const selectedOrder = useMemo(
     () => orders.find((order) => order._id === productionOrderId) ?? entry?.productionOrder,
     [entry?.productionOrder, orders, productionOrderId]
@@ -125,13 +138,11 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {orders
-                    .filter((order) => !['COMPLETED', 'CANCELLED'].includes(order.status))
-                    .map((order) => (
-                      <SelectItem key={order._id} value={order._id}>
-                        {order.poNumber} - {order.itemCode || 'Item code unavailable'}
-                      </SelectItem>
-                    ))}
+                  {availableOrders.map((order) => (
+                    <SelectItem key={order._id} value={order._id}>
+                      {order.poNumber} - {order.itemCode || 'Item code unavailable'}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}

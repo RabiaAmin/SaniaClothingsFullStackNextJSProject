@@ -29,6 +29,7 @@ export const ROUTE_PERMISSIONS = [
     path: '/production-entries',
     permission: ['production_entry.read_own', 'production_entry.read_all'],
   },
+  { match: /^\/payroll\/[^/]+$/, permission: 'payroll.export_pdf' },
   { path: '/payroll', permission: ['payroll.read_own', 'payroll.read_all'] },
   { path: '/clients', permission: 'client.read' },
   { path: '/business', permission: 'business.read' },

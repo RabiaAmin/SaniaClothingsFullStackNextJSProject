@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const POPULATE_FIELDS = [
   { path: 'actor', select: 'username email' },
   { path: 'productionEntry', select: 'date quantity unitRate totalAmount status' },
-  { path: 'productionOrder', select: 'poNumber productionDescription status' },
+  { path: 'productionOrder', select: 'poNumber itemCode productionDescription status' },
 ];
 
 exports.getNotifications = asyncHandler(async (req, res) => {

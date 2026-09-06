@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Banknote, Eye } from 'lucide-react';
 import EmptyState from '@/components/admin/EmptyState';
 import PageHeader from '@/components/admin/PageHeader';
@@ -25,12 +26,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
-import { useMonthlyPayroll } from '@/hooks/usePayroll';
+import { usePayroll } from '@/hooks/usePayroll';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
-function currentMonthValue() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+function rangeValidationMessage(startDate, endDate) {
+  if (!startDate || !endDate) return 'Start date and end date are required.';
+  if (startDate > endDate) return 'Start date cannot be after end date.';
+  return '';
+}
+
+function formatPeriodDate(value) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+    .formatToParts(new Date(`${value}T00:00:00.000Z`))
+    .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return `${parts.day} ${parts.month} ${parts.year}`;
 }
 
 function SummaryCard({ label, value, description }) {
@@ -46,16 +60,18 @@ function SummaryCard({ label, value, description }) {
 }
 
 export default function PayrollPage() {
+  const router = useRouter();
   const { hasPermission } = useAuth();
   const canReadAll = hasPermission('payroll.read_all');
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
+  const canViewPayroll = hasPermission('payroll.export_pdf');
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [selectedWorker, setSelectedWorker] = useState('all');
-  const [year, month] = selectedMonth.split('-').map(Number);
-  const baseParams = { year, month };
-  const allReport = useMonthlyPayroll(baseParams);
-  const workerReport = useMonthlyPayroll(
+  const validationMessage = rangeValidationMessage(dateRange.startDate, dateRange.endDate);
+  const baseParams = { startDate: dateRange.startDate, endDate: dateRange.endDate };
+  const allReport = usePayroll(baseParams, { enabled: !validationMessage });
+  const workerReport = usePayroll(
     { ...baseParams, workerId: selectedWorker },
-    { enabled: canReadAll && selectedWorker !== 'all' }
+    { enabled: !validationMessage && canReadAll && selectedWorker !== 'all' }
   );
   const activeQuery = selectedWorker === 'all' || !canReadAll ? allReport : workerReport;
   const report = activeQuery.data?.report;
@@ -71,36 +87,65 @@ export default function PayrollPage() {
       ),
     [report?.workers]
   );
-  const periodLabel = new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(year, month - 1, 1));
+  const periodLabel = validationMessage
+    ? 'Select a valid payroll period'
+    : `${formatPeriodDate(dateRange.startDate)} — ${formatPeriodDate(dateRange.endDate)}`;
 
-  function changeMonth(value) {
-    setSelectedMonth(value);
+  function changeDate(field, value) {
+    setDateRange((current) => ({ ...current, [field]: value }));
     setSelectedWorker('all');
+  }
+
+  function handleViewPayroll() {
+    if (validationMessage || selectedWorker === 'all') return;
+    const query = new URLSearchParams(baseParams);
+    router.push(`/payroll/${encodeURIComponent(selectedWorker)}?${query.toString()}`);
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={canReadAll ? 'Monthly Payroll' : 'My Earnings'}
+        title={canReadAll ? 'Payroll' : 'My Earnings'}
         description={
           canReadAll
             ? 'Calculated from approved worker production entries'
-            : 'Your approved production and earnings by month'
+            : 'Your approved production and earnings for the selected period'
+        }
+        action={
+          canViewPayroll ? (
+            <Button
+              type="button"
+              onClick={handleViewPayroll}
+              disabled={
+                Boolean(validationMessage) || selectedWorker === 'all' || activeQuery.isLoading
+              }
+            >
+              <Eye className="h-4 w-4" /> View Payroll
+            </Button>
+          ) : null
         }
       />
 
       <Card>
-        <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
+        <CardContent className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="payrollMonth">Month</Label>
+            <Label htmlFor="payrollStartDate">Start Date</Label>
             <Input
-              id="payrollMonth"
-              type="month"
-              value={selectedMonth}
-              onChange={(event) => changeMonth(event.target.value)}
+              id="payrollStartDate"
+              type="date"
+              required
+              value={dateRange.startDate}
+              onChange={(event) => changeDate('startDate', event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="payrollEndDate">End Date</Label>
+            <Input
+              id="payrollEndDate"
+              type="date"
+              required
+              value={dateRange.endDate}
+              onChange={(event) => changeDate('endDate', event.target.value)}
             />
           </div>
           {canReadAll && (
@@ -121,6 +166,17 @@ export default function PayrollPage() {
               </Select>
             </div>
           )}
+          <div className="border-t pt-4 sm:col-span-2 lg:col-span-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Payroll Period
+            </p>
+            <p className="mt-1 font-medium">{periodLabel}</p>
+            {validationMessage && (
+              <p role="alert" className="mt-1 text-sm text-destructive">
+                {validationMessage}
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -129,7 +185,7 @@ export default function PayrollPage() {
           <SummaryCard
             label="Workers"
             value={summary.workerCount ?? 0}
-            description={`With approved production in ${periodLabel}`}
+            description="With approved production in the selected period"
           />
         )}
         <SummaryCard
@@ -207,7 +263,7 @@ export default function PayrollPage() {
           ) : auditEntries.length === 0 ? (
             <EmptyState
               icon={Banknote}
-              title="No approved earnings for this month"
+              title="No approved earnings for this period"
               description="Pending and rejected production entries are not included."
               className="m-6"
             />

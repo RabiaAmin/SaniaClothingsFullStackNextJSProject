@@ -7,6 +7,7 @@ export const PRODUCTION_ORDER_KEYS = {
   all: ['production-orders'],
   list: (params) => ['production-orders', 'list', params ?? {}],
   detail: (id) => ['production-orders', 'detail', id],
+  assignableWorkers: ['production-orders', 'assignable-workers'],
 };
 
 export function useProductionOrders(params, options = {}) {
@@ -22,6 +23,14 @@ export function useProductionOrder(id) {
     queryKey: PRODUCTION_ORDER_KEYS.detail(id),
     queryFn: () => productionOrderApi.getProductionOrder(id).then((response) => response.data),
     enabled: Boolean(id),
+  });
+}
+
+export function useAssignableWorkers(options = {}) {
+  return useQuery({
+    queryKey: PRODUCTION_ORDER_KEYS.assignableWorkers,
+    queryFn: () => productionOrderApi.getAssignableWorkers().then((response) => response.data),
+    enabled: options.enabled ?? true,
   });
 }
 

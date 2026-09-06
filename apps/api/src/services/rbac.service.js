@@ -7,6 +7,7 @@ const PERMISSIONS = [
   ['production_order.create', 'production_order', 'create', 'Create production orders'],
   ['production_order.read', 'production_order', 'read', 'View production orders'],
   ['production_order.update', 'production_order', 'update', 'Update production orders'],
+  ['production_order.assign', 'production_order', 'assign', 'Assign workers to production orders'],
   ['production_order.delete', 'production_order', 'delete', 'Delete production orders'],
   ['production_entry.create', 'production_entry', 'create', 'Create production entries'],
   ['production_entry.read_own', 'production_entry', 'read_own', 'View own production entries'],
@@ -25,8 +26,9 @@ const PERMISSIONS = [
   ],
   ['production_entry.approve', 'production_entry', 'approve', 'Approve production entries'],
   ['production_entry.reject', 'production_entry', 'reject', 'Reject production entries'],
-  ['payroll.read_own', 'payroll', 'read_own', 'View own monthly earnings'],
+  ['payroll.read_own', 'payroll', 'read_own', 'View own payroll earnings'],
   ['payroll.read_all', 'payroll', 'read_all', 'View all worker payroll reports'],
+  ['payroll.export_pdf', 'payroll', 'export_pdf', 'Generate admin payroll PDF reports'],
   ['invoice.*', 'invoice', '*', 'Manage invoices and statements'],
   ['client.*', 'client', '*', 'Manage clients'],
   ['product.*', 'product', '*', 'Manage catalogue products'],
@@ -51,6 +53,7 @@ const ROLE_DEFINITIONS = [
       'production_order.create',
       'production_order.read',
       'production_order.update',
+      'production_order.assign',
       'production_order.delete',
       'production_entry.create',
       'production_entry.read_all',
@@ -107,9 +110,13 @@ async function assignInitialAdminSafely(adminRole) {
 }
 
 async function initializeRbac() {
-  const payrollKeys = ['payroll.read_own', 'payroll.read_all'];
-  const existingPayrollKeys = new Set(
-    await Permission.find({ key: { $in: payrollKeys } }).distinct('key')
+  const additivePermissionKeys = [
+    'payroll.read_own',
+    'payroll.read_all',
+    'production_order.assign',
+  ];
+  const existingAdditivePermissionKeys = new Set(
+    await Permission.find({ key: { $in: additivePermissionKeys } }).distinct('key')
   );
   const permissions = await Promise.all(PERMISSIONS.map(upsertPermission));
   const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission]));
@@ -143,12 +150,13 @@ async function initializeRbac() {
     { new: true }
   );
 
-  const initialPayrollGrants = [
+  const initialAdditiveGrants = [
     ['production-manager', 'payroll.read_all'],
     ['worker', 'payroll.read_own'],
+    ['production-manager', 'production_order.assign'],
   ];
-  for (const [slug, permissionKey] of initialPayrollGrants) {
-    if (!existingPayrollKeys.has(permissionKey)) {
+  for (const [slug, permissionKey] of initialAdditiveGrants) {
+    if (!existingAdditivePermissionKeys.has(permissionKey)) {
       roles[slug] = await Role.findOneAndUpdate(
         { slug },
         { $addToSet: { permissions: permissionByKey.get(permissionKey)._id } },

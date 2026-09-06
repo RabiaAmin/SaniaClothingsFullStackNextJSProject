@@ -74,6 +74,7 @@
  * @property {string} _id
  * @property {string} poNumber
  * @property {string} [itemCode] Required for new orders; older records may not have one.
+ * @property {User[]|string[]} [assignedWorkers]
  * @property {Client} client
  * @property {Object|null} product
  * @property {string} productionDescription
@@ -82,6 +83,9 @@
  * @property {number} producedQuantity
  * @property {number} remainingQuantity
  * @property {number} progressPercentage
+ * @property {string|null} productionDeadline
+ * @property {'NOT_STARTED'|'IN_PROGRESS'|'COMPLETED'|'OVERDUE'|'CANCELLED'} calculatedStatus
+ * @property {'DUE_SOON'|'OVERDUE'|null} deadlineStatus
  * @property {number} workerRate
  * @property {string} startDate
  * @property {string} dueDate

@@ -152,7 +152,7 @@ const permissions = [
     key: 'payroll.read_all',
     resource: 'payroll',
     action: 'read_all',
-    description: 'View all monthly payroll',
+    description: 'View all payroll reports',
   },
 ];
 
@@ -203,6 +203,7 @@ const productionOrder = {
   _id: 'production-order-1',
   poNumber: 'PO-2026-001',
   itemCode: 'JK001',
+  assignedWorkers: [],
   client: { _id: 'client-1', name: 'Acme Retail', email: 'buyer@acme.test' },
   product: { _id: 'prod-1', name: 'Denim Work Jacket', category: 'Jackets' },
   productionDescription: 'Navy work jackets for winter delivery',
@@ -211,6 +212,9 @@ const productionOrder = {
   producedQuantity: 80,
   remainingQuantity: 40,
   progressPercentage: 67,
+  productionDeadline: '2026-08-30T00:00:00.000Z',
+  calculatedStatus: 'IN_PROGRESS',
+  deadlineStatus: null,
   workerRate: 12.5,
   startDate: '2026-08-01T00:00:00.000Z',
   dueDate: '2026-08-31T00:00:00.000Z',
@@ -261,6 +265,9 @@ async function mockApi(page, options = {}) {
   let createdUser = null;
   let createdUserPassword = null;
   const managedUsers = [currentUser];
+  const assignedWorkers = (options.assignedWorkerIds ?? [])
+    .map((workerId) => [worker, secondWorker].find((item) => item._id === workerId))
+    .filter(Boolean);
   let currentApprovedQuantity = productionOrder.approvedQuantity;
   const productionEntries = [
     {
@@ -488,10 +495,14 @@ async function mockApi(page, options = {}) {
       return response(route, { success: true, notification });
     }
 
+    if (method === 'GET' && path === '/production-orders/eligible-workers') {
+      return response(route, { success: true, workers: [worker, secondWorker] });
+    }
     if (method === 'GET' && path === '/production-orders') {
       const productionOrders = [
         {
           ...productionOrder,
+          assignedWorkers,
           approvedQuantity: currentApprovedQuantity,
           invoiceRelationship,
         },
@@ -502,6 +513,31 @@ async function mockApi(page, options = {}) {
                 _id: 'production-order-legacy',
                 poNumber: 'PO-LEGACY-001',
                 itemCode: undefined,
+              },
+            ]
+          : []),
+        ...(options.includeDeadlineAlerts
+          ? [
+              {
+                ...productionOrder,
+                _id: 'production-order-due-soon',
+                poNumber: 'PO-DUE-SOON',
+                itemCode: 'DUE001',
+                productionDeadline: '2026-09-07T00:00:00.000Z',
+                deadlineStatus: 'DUE_SOON',
+              },
+              {
+                ...productionOrder,
+                _id: 'production-order-overdue',
+                poNumber: 'PO-OVERDUE',
+                itemCode: 'LATE001',
+                producedQuantity: 70,
+                approvedQuantity: 70,
+                remainingQuantity: 50,
+                progressPercentage: 58,
+                productionDeadline: '2026-09-05T00:00:00.000Z',
+                calculatedStatus: 'OVERDUE',
+                deadlineStatus: 'OVERDUE',
               },
             ]
           : []),
@@ -528,7 +564,7 @@ async function mockApi(page, options = {}) {
     if (method === 'GET' && path.startsWith('/production-orders/')) {
       return response(route, {
         success: true,
-        productionOrder,
+        productionOrder: { ...productionOrder, assignedWorkers },
         invoiceRelationship,
         matchingInvoices: relatedInvoices,
       });
@@ -635,7 +671,17 @@ async function mockApi(page, options = {}) {
       return response(route, { success: true, productionEntry: entry });
     }
 
-    if (method === 'GET' && path === '/payroll/monthly') {
+    if (method === 'GET' && ['/payroll/range', '/payroll/monthly', '/payroll/pdf'].includes(path)) {
+      const canExportPayrollPdf =
+        sessionUser.permissions?.includes('*') ||
+        sessionUser.permissions?.includes('payroll.export_pdf');
+      if (path === '/payroll/pdf' && !canExportPayrollPdf) {
+        return response(
+          route,
+          { success: false, message: 'You do not have permission to perform this action' },
+          403
+        );
+      }
       const payrollWorkers = [
         {
           worker,
@@ -683,15 +729,27 @@ async function mockApi(page, options = {}) {
       const visibleWorkers = requestedWorker
         ? payrollWorkers.filter((item) => item.worker._id === requestedWorker)
         : payrollWorkers;
+      const selectedPayrollWorker = requestedWorker
+        ? [worker, secondWorker].find((item) => item._id === requestedWorker)
+        : null;
+      if (path === '/payroll/pdf' && requestedWorker && !selectedPayrollWorker) {
+        return response(route, { success: false, message: 'Worker not found' }, 404);
+      }
+      const startDate = url.searchParams.get('startDate');
+      const endDate = url.searchParams.get('endDate');
       return response(route, {
         success: true,
+        ...(path === '/payroll/pdf' && { business }),
+        ...(path === '/payroll/pdf' && { selectedWorker: selectedPayrollWorker }),
         scope: canReadAll ? (requestedWorker ? 'worker' : 'all') : 'own',
         report: {
           period: {
-            year: Number(url.searchParams.get('year')),
-            month: Number(url.searchParams.get('month')),
-            start: '2026-08-01T00:00:00.000Z',
-            end: '2026-09-01T00:00:00.000Z',
+            ...(path === '/payroll/monthly' && {
+              year: Number(url.searchParams.get('year')),
+              month: Number(url.searchParams.get('month')),
+            }),
+            start: `${startDate ?? '2026-08-01'}T00:00:00.000Z`,
+            end: `${endDate ?? '2026-09-01'}T00:00:00.000Z`,
           },
           summary: {
             workerCount: visibleWorkers.length,

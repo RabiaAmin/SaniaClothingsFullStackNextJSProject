@@ -20,6 +20,10 @@ test('notification types remain extensible while production workflow types are d
     Notification.NOTIFICATION_TYPES.PRODUCTION_ENTRY_SUBMITTED,
     'PRODUCTION_ENTRY_SUBMITTED'
   );
+  assert.equal(
+    Notification.NOTIFICATION_TYPES.PRODUCTION_ORDER_ASSIGNED,
+    'PRODUCTION_ORDER_ASSIGNED'
+  );
 
   const notification = new Notification({
     recipient: new mongoose.Types.ObjectId(),

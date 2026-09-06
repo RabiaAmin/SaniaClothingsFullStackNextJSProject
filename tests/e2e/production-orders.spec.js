@@ -8,9 +8,10 @@ test('production order list supports progress, status, and PO search', async ({ 
 
   await expect(page.getByRole('heading', { name: 'Production Orders' })).toBeVisible();
   await expect(page.getByText('PO-2026-001', { exact: true })).toBeVisible();
-  await expect(page.getByText('Ordered: 120')).toBeVisible();
-  await expect(page.getByText('Produced: 80')).toBeVisible();
-  await expect(page.getByText('Remaining: 40')).toBeVisible();
+  await expect(page.getByText('80 / 120 produced')).toBeVisible();
+  await expect(page.getByText('40 remaining')).toBeVisible();
+  await expect(page.getByText('Aug 30, 2026')).toBeVisible();
+  await expect(page.getByText('In Progress', { exact: true })).toBeVisible();
   await expect(page.getByText('Invoice 1001')).toBeVisible();
   await expect(page.getByText('Sent', { exact: true })).toBeVisible();
   await page.getByPlaceholder('Search PO number or description').fill('PO-2026-001');
@@ -75,6 +76,7 @@ test('admin can create a production order independently from invoices', async ({
           productId: 'prod-1',
           orderedQuantity: 120,
           workerRate: 15.5,
+          assignedWorkerIds: [],
         }),
       })
     );
@@ -122,6 +124,41 @@ test('admin can view and update a production order item code', async ({ page }) 
       )
     )
     .toEqual(expect.objectContaining({ payload: expect.objectContaining({ itemCode: 'jk009' }) }));
+});
+
+test('admin can change and remove worker assignments when editing an order', async ({ page }) => {
+  const calls = await mockApi(page, { assignedWorkerIds: ['user-worker'] });
+  await signInAsAdmin(page);
+  await page.goto('/production-orders/production-order-1/edit');
+
+  const firstWorker = page.getByRole('checkbox', { name: /worker worker@sania\.test/ });
+  const secondWorker = page.getByRole('checkbox', { name: /worker-two worker2@sania\.test/ });
+  await expect(firstWorker).toBeChecked();
+  await secondWorker.check();
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await expect
+    .poll(() =>
+      calls.find(
+        (call) => call.method === 'PUT' && call.path === '/production-orders/production-order-1'
+      )
+    )
+    .toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          assignedWorkerIds: ['user-worker', 'user-worker-2'],
+        }),
+      })
+    );
+
+  calls.length = 0;
+  await page.goto('/production-orders/production-order-1/edit');
+  await firstWorker.uncheck();
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await expect
+    .poll(() => calls.find((call) => call.method === 'PUT'))
+    .toEqual(
+      expect.objectContaining({ payload: expect.objectContaining({ assignedWorkerIds: [] }) })
+    );
 });
 
 test('worker can read orders but cannot create, edit, or query client administration', async ({

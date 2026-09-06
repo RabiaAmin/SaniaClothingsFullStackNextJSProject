@@ -4,6 +4,30 @@ function roundMoney(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function parseUtcDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function getDateRange(startDate, endDate) {
+  const start = parseUtcDate(startDate);
+  const end = parseUtcDate(endDate);
+  if (!start || !end || start > end) return null;
+
+  const endExclusive = new Date(end);
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  return { start, end, endExclusive };
+}
+
 function getMonthRange(year, month) {
   const parsedYear = Number(year);
   const parsedMonth = Number(month);
@@ -37,6 +61,10 @@ function workerIdentity(worker) {
 }
 
 function buildMonthlyPayrollReport(entries, period) {
+  return buildPayrollReport(entries, period);
+}
+
+function buildPayrollReport(entries, period) {
   const uniqueEntries = new Map();
   for (const entry of entries) {
     if (entry.status !== 'APPROVED') continue;
@@ -97,8 +125,8 @@ function buildMonthlyPayrollReport(entries, period) {
 
   return {
     period: {
-      year: period.year,
-      month: period.month,
+      ...(period.year !== undefined && { year: period.year }),
+      ...(period.month !== undefined && { month: period.month }),
       start: period.start,
       end: period.end,
     },
@@ -112,17 +140,15 @@ function buildMonthlyPayrollReport(entries, period) {
   };
 }
 
-async function getMonthlyPayrollReport({ year, month, workerId }) {
-  const period = getMonthRange(year, month);
-  if (!period) return null;
-
+async function findPayrollEntries(period, workerId) {
+  const rangeEnd = period.endExclusive ?? period.end;
   const filter = {
     status: 'APPROVED',
-    date: { $gte: period.start, $lt: period.end },
+    date: { $gte: period.start, $lt: rangeEnd },
   };
   if (workerId) filter.worker = workerId;
 
-  const entries = await ProductionEntry.find(filter)
+  return ProductionEntry.find(filter)
     .select('productionOrder worker date quantity unitRate status')
     .populate({
       path: 'productionOrder',
@@ -132,13 +158,28 @@ async function getMonthlyPayrollReport({ year, month, workerId }) {
     .populate({ path: 'worker', select: 'username email' })
     .sort({ worker: 1, date: 1, createdAt: 1 })
     .lean();
+}
 
+async function getPayrollReport({ startDate, endDate, workerId }) {
+  const period = getDateRange(startDate, endDate);
+  if (!period) return null;
+  const entries = await findPayrollEntries(period, workerId);
+  return buildPayrollReport(entries, period);
+}
+
+async function getMonthlyPayrollReport({ year, month, workerId }) {
+  const period = getMonthRange(year, month);
+  if (!period) return null;
+  const entries = await findPayrollEntries(period, workerId);
   return buildMonthlyPayrollReport(entries, period);
 }
 
 module.exports = {
   roundMoney,
+  getDateRange,
   getMonthRange,
+  buildPayrollReport,
   buildMonthlyPayrollReport,
+  getPayrollReport,
   getMonthlyPayrollReport,
 };

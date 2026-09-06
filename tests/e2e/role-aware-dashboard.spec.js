@@ -69,6 +69,22 @@ test('Production Manager sees production operations without invoice access', asy
   await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
 });
 
+test('Production Manager sees due-soon and overdue production alerts without notifications', async ({
+  page,
+}) => {
+  const calls = await mockApi(page, { user: productionManager, includeDeadlineAlerts: true });
+  await page.goto('/dashboard');
+
+  const alerts = page.getByTestId('production-alerts');
+  await expect(alerts.getByText('PO-DUE-SOON · DUE001')).toBeVisible();
+  await expect(alerts.getByText('Due soon', { exact: true })).toBeVisible();
+  await expect(alerts.getByText('PO-OVERDUE · LATE001')).toBeVisible();
+  await expect(alerts.getByText('Overdue', { exact: true })).toBeVisible();
+  expect(calls.some((call) => call.method === 'POST' && call.path === '/notifications')).toBe(
+    false
+  );
+});
+
 test('Worker sees only personal production, earnings, orders, and notifications', async ({
   page,
 }) => {
@@ -80,6 +96,11 @@ test('Worker sees only personal production, earnings, orders, and notifications'
   await expect(page.getByText('Estimated earnings')).toBeVisible();
   await expect(page.getByText('Approved earnings')).toBeVisible();
   await expect(page.getByText('Available production orders')).toBeVisible();
+  await expect(page.getByText('My Assigned Orders')).toBeVisible();
+  await expect(page.getByText('JK001', { exact: true })).toBeVisible();
+  await expect(page.getByText(/40 remaining/)).toBeVisible();
+  await expect(page.getByText(/Deadline Aug 30, 2026/)).toBeVisible();
+  await expect(page.getByText('In Progress', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
   await expect(page.getByTestId('invoice-dashboard')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'User Access' })).toHaveCount(0);
@@ -87,6 +108,15 @@ test('Worker sees only personal production, earnings, orders, and notifications'
 
   await page.goto('/users');
   await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+});
+
+test('Worker sees assigned work separately from open production orders', async ({ page }) => {
+  await mockApi(page, { user: worker, assignedWorkerIds: ['user-worker'] });
+  await page.goto('/dashboard');
+
+  await expect(page.getByText('My Assigned Orders')).toBeVisible();
+  await expect(page.getByText('PO-2026-001', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('No unassigned production orders are available.')).toBeVisible();
 });
 
 test('Invoice Manager retains the invoice workflow without production access', async ({ page }) => {

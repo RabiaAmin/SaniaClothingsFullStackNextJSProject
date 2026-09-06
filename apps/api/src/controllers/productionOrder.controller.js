@@ -10,12 +10,22 @@ const {
   findInvoiceRelationships,
   normalizePoNumber,
 } = require('../services/productionInvoice.service');
+const {
+  enrichProductionOrder,
+  enrichProductionOrders,
+} = require('../services/productionProgress.service');
+const {
+  getAssignableWorkers,
+  notifyAssignedWorkers,
+  resolveAssignedWorkerIds,
+} = require('../services/productionAssignment.service');
 const { PRODUCTION_ORDER_STATUSES } = ProductionOrder;
 const { escapeRegex } = require('../utils/query');
 
 const POPULATE_FIELDS = [
   { path: 'client', select: 'name email phone' },
   { path: 'product', select: 'name description category images' },
+  { path: 'assignedWorkers', select: 'username email isActive' },
   { path: 'createdBy', select: 'username email' },
   { path: 'updatedBy', select: 'username email' },
 ];
@@ -56,10 +66,44 @@ async function validateReferences(clientId, productId) {
   return { client, product };
 }
 
+function canManageAssignments(req) {
+  return hasPermission(req.user, 'production_order.assign');
+}
+
+async function resolveRequestedAssignments(req, assignedWorkerIds) {
+  if (assignedWorkerIds === undefined) return null;
+  if (!canManageAssignments(req)) {
+    const error = new Error('You do not have permission to assign production orders');
+    error.statusCode = 403;
+    throw error;
+  }
+  return resolveAssignedWorkerIds(assignedWorkerIds);
+}
+
+async function sendAssignmentNotifications(payload) {
+  try {
+    await notifyAssignedWorkers(payload);
+  } catch (notificationError) {
+    console.error(
+      'Failed to create production assignment notifications:',
+      notificationError.message
+    );
+  }
+}
+
+exports.getAssignableWorkers = asyncHandler(async (req, res) => {
+  const workers = await getAssignableWorkers();
+  res.status(200).json({
+    success: true,
+    workers: workers.map(({ _id, username, email }) => ({ _id, username, email })),
+  });
+});
+
 exports.createProductionOrder = asyncHandler(async (req, res) => {
   const {
     poNumber,
     itemCode,
+    assignedWorkerIds,
     clientId,
     productId,
     productionDescription,
@@ -73,6 +117,7 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
 
   const normalizedPoNumber = normalizePoNumber(poNumber);
   const normalizedItemCode = normalizeItemCode(itemCode);
+  const assignments = (await resolveRequestedAssignments(req, assignedWorkerIds)) ?? [];
   const parsedQuantity = parsePositiveInteger(orderedQuantity);
   const parsedRate = parseNonNegativeNumber(workerRate);
   if (!normalizedPoNumber || !normalizedItemCode || !clientId || !startDate || !dueDate) {
@@ -113,6 +158,7 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
   const productionOrder = await ProductionOrder.create({
     poNumber: normalizedPoNumber,
     itemCode: normalizedItemCode,
+    assignedWorkers: assignments,
     client: clientId,
     product: productId || null,
     productionDescription: description,
@@ -125,12 +171,18 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
     updatedBy: req.user._id,
   });
+  await sendAssignmentNotifications({
+    workerIds: assignments,
+    order: productionOrder,
+    actorId: req.user._id,
+  });
   await productionOrder.populate(POPULATE_FIELDS);
+  const responseOrder = await enrichProductionOrder(productionOrder);
 
   res.status(201).json({
     success: true,
     message: 'Production order created successfully',
-    productionOrder,
+    productionOrder: responseOrder,
   });
 });
 
@@ -155,6 +207,21 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
     }
     filter.client = req.query.clientId;
   }
+  if (
+    hasPermission(req.user, 'production_entry.read_own') &&
+    !hasPermission(req.user, 'production_entry.read_all')
+  ) {
+    filter.$and = [
+      ...(filter.$and ?? []),
+      {
+        $or: [
+          { assignedWorkers: req.user._id },
+          { assignedWorkers: { $exists: false } },
+          { assignedWorkers: { $size: 0 } },
+        ],
+      },
+    ];
+  }
 
   let [productionOrders, totalRecords] = await Promise.all([
     ProductionOrder.find(filter)
@@ -164,6 +231,7 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
       .limit(limit),
     ProductionOrder.countDocuments(filter),
   ]);
+  productionOrders = await enrichProductionOrders(productionOrders);
 
   if (hasPermission(req.user, 'invoice.read') && productionOrders.length > 0) {
     const relationships = await findInvoiceRelationships(
@@ -173,7 +241,7 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
       const { invoices, ...invoiceRelationship } = relationships.get(
         normalizePoNumber(order.poNumber)
       );
-      return { ...order.toObject(), invoiceRelationship };
+      return { ...order, invoiceRelationship };
     });
   }
 
@@ -196,10 +264,11 @@ exports.getProductionOrder = asyncHandler(async (req, res) => {
     ? await findInvoiceRelationship(productionOrder.poNumber)
     : null;
   const matchingInvoices = invoiceRelationship?.invoices ?? [];
+  const responseOrder = await enrichProductionOrder(productionOrder);
 
   res.status(200).json({
     success: true,
-    productionOrder,
+    productionOrder: responseOrder,
     invoiceRelationship,
     matchingInvoices,
   });
@@ -210,6 +279,8 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
   if (!productionOrder) {
     return res.status(404).json({ success: false, message: 'Production order not found' });
   }
+  const previousAssignedWorkerIds = (productionOrder.assignedWorkers ?? []).map(String);
+  const assignments = await resolveRequestedAssignments(req, req.body.assignedWorkerIds);
 
   if (req.body.poNumber !== undefined) {
     const poNumber = normalizePoNumber(req.body.poNumber);
@@ -229,6 +300,7 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
     }
     productionOrder.itemCode = itemCode;
   }
+  if (assignments !== null) productionOrder.assignedWorkers = assignments;
 
   const nextClientId = req.body.clientId ?? productionOrder.client;
   const nextProductId =
@@ -292,12 +364,20 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
   }
   productionOrder.updatedBy = req.user._id;
   await productionOrder.save({ validateModifiedOnly: true });
+  const newlyAssignedWorkerIds =
+    assignments?.filter((workerId) => !previousAssignedWorkerIds.includes(String(workerId))) ?? [];
+  await sendAssignmentNotifications({
+    workerIds: newlyAssignedWorkerIds,
+    order: productionOrder,
+    actorId: req.user._id,
+  });
   await productionOrder.populate(POPULATE_FIELDS);
+  const responseOrder = await enrichProductionOrder(productionOrder);
 
   res.status(200).json({
     success: true,
     message: 'Production order updated successfully',
-    productionOrder,
+    productionOrder: responseOrder,
   });
 });
 
@@ -314,10 +394,11 @@ exports.updateProductionOrderStatus = asyncHandler(async (req, res) => {
   productionOrder.updatedBy = req.user._id;
   await productionOrder.save({ validateModifiedOnly: true });
   await productionOrder.populate(POPULATE_FIELDS);
+  const responseOrder = await enrichProductionOrder(productionOrder);
   res.status(200).json({
     success: true,
     message: 'Production order status updated',
-    productionOrder,
+    productionOrder: responseOrder,
   });
 });
 

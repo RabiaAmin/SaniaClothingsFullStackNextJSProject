@@ -8,15 +8,25 @@ import ProductionOrderForm from '@/components/production/ProductionOrderForm';
 import { Button } from '@/components/ui/button';
 import { useClients } from '@/hooks/useClients';
 import { useProducts } from '@/hooks/useProducts';
-import { useProductionOrder, useUpdateProductionOrder } from '@/hooks/useProductionOrders';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  useAssignableWorkers,
+  useProductionOrder,
+  useUpdateProductionOrder,
+} from '@/hooks/useProductionOrders';
 import { toast } from '@/hooks/useToast';
 
 export default function EditProductionOrderPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { hasPermission } = useAuth();
+  const canAssignWorkers = hasPermission('production_order.assign');
   const { data, isLoading: orderLoading, error } = useProductionOrder(id);
   const { data: clientData, isLoading: clientsLoading } = useClients();
   const { data: productData, isLoading: productsLoading } = useProducts({});
+  const { data: workerData, isLoading: workersLoading } = useAssignableWorkers({
+    enabled: canAssignWorkers,
+  });
   const updateOrder = useUpdateProductionOrder();
   const productionOrder = data?.productionOrder;
 
@@ -33,7 +43,8 @@ export default function EditProductionOrderPage() {
     }
   }
 
-  const loading = orderLoading || clientsLoading || productsLoading;
+  const loading =
+    orderLoading || clientsLoading || productsLoading || (canAssignWorkers && workersLoading);
 
   return (
     <div className="space-y-6">
@@ -63,6 +74,8 @@ export default function EditProductionOrderPage() {
           productionOrder={productionOrder}
           clients={clientData?.clients ?? []}
           products={productData?.products ?? []}
+          workers={workerData?.workers ?? []}
+          canAssignWorkers={canAssignWorkers}
           onSubmit={handleSubmit}
           onCancel={() => router.push(`/production-orders/${id}`)}
           submitting={updateOrder.isPending}

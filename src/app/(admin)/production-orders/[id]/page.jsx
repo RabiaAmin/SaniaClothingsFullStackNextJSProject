@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   ClipboardCheck,
   FileText,
   Pencil,
@@ -35,8 +36,10 @@ import {
 import { toast } from '@/hooks/useToast';
 import {
   PRODUCTION_ORDER_STATUSES,
+  productionOrderProgressColor,
   productionOrderStatusLabel,
   productionOrderStatusVariant,
+  productionOrderTracking,
 } from '@/lib/productionOrders';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
@@ -47,6 +50,11 @@ function Metric({ label, value, className = '' }) {
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
+}
+
+function formatOptionalDate(value) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return 'Unavailable';
+  return formatDate(value);
 }
 
 export default function ProductionOrderDetailPage() {
@@ -64,11 +72,7 @@ export default function ProductionOrderDetailPage() {
     matchCount: matchingInvoices.length,
     invoices: matchingInvoices,
   };
-  const produced = order?.approvedQuantity ?? order?.producedQuantity ?? 0;
-  const remaining = order ? Math.max(0, order.orderedQuantity - produced) : 0;
-  const progress = order?.orderedQuantity
-    ? Math.round((produced / order.orderedQuantity) * 100)
-    : 0;
+  const tracking = productionOrderTracking(order);
 
   async function handleStatusChange(status) {
     try {
@@ -149,8 +153,9 @@ export default function ProductionOrderDetailPage() {
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        <Badge variant={productionOrderStatusVariant(order.status)}>
-          {productionOrderStatusLabel(order.status)}
+        <Badge variant={productionOrderStatusVariant(tracking.status)}>
+          {tracking.status === 'COMPLETED' && <CheckCircle2 className="mr-1 h-3.5 w-3.5" />}
+          {productionOrderStatusLabel(tracking.status)}
         </Badge>
         <PermissionGuard permission="production_order.update">
           <Select
@@ -166,7 +171,7 @@ export default function ProductionOrderDetailPage() {
                 <SelectItem
                   key={status}
                   value={status}
-                  disabled={status === 'COMPLETED' && remaining > 0}
+                  disabled={status === 'COMPLETED' && tracking.remainingQuantity > 0}
                 >
                   {productionOrderStatusLabel(status)}
                 </SelectItem>
@@ -177,21 +182,21 @@ export default function ProductionOrderDetailPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Metric label="Ordered" value={order.orderedQuantity} />
-        <Metric label="Produced" value={produced} />
-        <Metric label="Remaining" value={remaining} />
+        <Metric label="Ordered" value={tracking.orderedQuantity} />
+        <Metric label="Produced" value={tracking.producedQuantity} />
+        <Metric label="Remaining" value={tracking.remainingQuantity} />
       </div>
 
       <Card>
         <CardContent className="p-6">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="font-medium">Production progress</span>
-            <span className="text-muted-foreground">{progress}%</span>
+            <span className="text-muted-foreground">{tracking.progressPercentage}%</span>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${progress}%` }}
+              className={`h-full rounded-full transition-all ${productionOrderProgressColor(order)}`}
+              style={{ width: `${tracking.progressPercentage}%` }}
             />
           </div>
         </CardContent>
@@ -215,6 +220,20 @@ export default function ProductionOrderDetailPage() {
               <p className="text-muted-foreground">Catalogue product</p>
               <p className="font-medium">{order.product?.name ?? 'Custom production'}</p>
             </div>
+            <div className="sm:col-span-2">
+              <p className="text-muted-foreground">Assigned workers</p>
+              {(order.assignedWorkers ?? []).length === 0 ? (
+                <p className="font-medium">Open to eligible workers</p>
+              ) : (
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {order.assignedWorkers.map((worker, index) => (
+                    <Badge key={worker?._id ?? worker ?? index} variant="secondary">
+                      {worker?.username ?? worker?.email ?? 'Assigned worker'}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
             <div>
               <p className="text-muted-foreground">Worker rate per unit</p>
               <p className="font-medium">{formatCurrency(order.workerRate)}</p>
@@ -235,8 +254,27 @@ export default function ProductionOrderDetailPage() {
             <div className="flex items-start gap-2">
               <CalendarDays className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-muted-foreground">Due date</p>
-                <p className="font-medium">{formatDate(order.dueDate)}</p>
+                <p className="text-muted-foreground">Client due date</p>
+                <p className="font-medium">{formatOptionalDate(order.dueDate)}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <CalendarDays className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-muted-foreground">Production deadline</p>
+                <p
+                  className={`font-medium ${
+                    tracking.deadlineStatus === 'OVERDUE'
+                      ? 'text-destructive'
+                      : tracking.deadlineStatus === 'DUE_SOON'
+                        ? 'text-yellow-700 dark:text-yellow-300'
+                        : ''
+                  }`}
+                >
+                  {tracking.productionDeadline
+                    ? formatDate(tracking.productionDeadline)
+                    : 'Unavailable'}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-2 sm:col-span-2">

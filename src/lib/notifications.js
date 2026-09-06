@@ -8,5 +8,6 @@ export function notificationTypeLabel(type) {
   if (type === 'PRODUCTION_ENTRY_SUBMITTED') return 'Production submitted';
   if (type === 'PRODUCTION_ENTRY_APPROVED') return 'Production approved';
   if (type === 'PRODUCTION_ENTRY_REJECTED') return 'Production rejected';
+  if (type === 'PRODUCTION_ORDER_ASSIGNED') return 'Production order assigned';
   return 'Notification';
 }

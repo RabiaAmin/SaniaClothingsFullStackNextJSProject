@@ -8,13 +8,19 @@ import ProductionOrderForm from '@/components/production/ProductionOrderForm';
 import { Button } from '@/components/ui/button';
 import { useClients } from '@/hooks/useClients';
 import { useProducts } from '@/hooks/useProducts';
-import { useCreateProductionOrder } from '@/hooks/useProductionOrders';
+import { useAuth } from '@/hooks/useAuth';
+import { useAssignableWorkers, useCreateProductionOrder } from '@/hooks/useProductionOrders';
 import { toast } from '@/hooks/useToast';
 
 export default function CreateProductionOrderPage() {
   const router = useRouter();
+  const { hasPermission } = useAuth();
+  const canAssignWorkers = hasPermission('production_order.assign');
   const { data: clientData, isLoading: clientsLoading } = useClients();
   const { data: productData, isLoading: productsLoading } = useProducts({});
+  const { data: workerData, isLoading: workersLoading } = useAssignableWorkers({
+    enabled: canAssignWorkers,
+  });
   const createOrder = useCreateProductionOrder();
 
   async function handleSubmit(payload) {
@@ -30,7 +36,7 @@ export default function CreateProductionOrderPage() {
     }
   }
 
-  const loading = clientsLoading || productsLoading;
+  const loading = clientsLoading || productsLoading || (canAssignWorkers && workersLoading);
 
   return (
     <div className="space-y-6">
@@ -55,6 +61,8 @@ export default function CreateProductionOrderPage() {
         <ProductionOrderForm
           clients={clientData?.clients ?? []}
           products={productData?.products ?? []}
+          workers={workerData?.workers ?? []}
+          canAssignWorkers={canAssignWorkers}
           onSubmit={handleSubmit}
           onCancel={() => router.push('/production-orders')}
           submitting={createOrder.isPending}

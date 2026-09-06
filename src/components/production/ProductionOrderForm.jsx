@@ -20,7 +20,8 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function initialForm(order) {
+function initialForm(order, workers) {
+  const eligibleWorkerIds = new Set(workers.map((worker) => String(worker._id)));
   return {
     poNumber: order?.poNumber ?? '',
     itemCode: order?.itemCode ?? '',
@@ -32,6 +33,9 @@ function initialForm(order) {
     startDate: order?.startDate?.slice(0, 10) ?? today(),
     dueDate: order?.dueDate?.slice(0, 10) ?? today(),
     notes: order?.notes ?? '',
+    assignedWorkerIds: (order?.assignedWorkers ?? [])
+      .map((worker) => String(worker?._id ?? worker))
+      .filter((workerId) => eligibleWorkerIds.has(workerId)),
   };
 }
 
@@ -39,16 +43,20 @@ export default function ProductionOrderForm({
   productionOrder,
   clients,
   products,
+  workers = [],
+  canAssignWorkers = false,
   onSubmit,
   onCancel,
   submitting,
   submitLabel,
 }) {
-  const [form, setForm] = useState(() => initialForm(productionOrder));
+  const [form, setForm] = useState(() => initialForm(productionOrder, workers));
+  const [assignmentsChanged, setAssignmentsChanged] = useState(false);
 
   useEffect(() => {
-    setForm(initialForm(productionOrder));
-  }, [productionOrder]);
+    setForm(initialForm(productionOrder, workers));
+    setAssignmentsChanged(false);
+  }, [productionOrder, workers]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -63,6 +71,16 @@ export default function ProductionOrderForm({
         product && !current.productionDescription.trim()
           ? product.name
           : current.productionDescription,
+    }));
+  }
+
+  function toggleWorker(workerId) {
+    setAssignmentsChanged(true);
+    setForm((current) => ({
+      ...current,
+      assignedWorkerIds: current.assignedWorkerIds.includes(workerId)
+        ? current.assignedWorkerIds.filter((id) => id !== workerId)
+        : [...current.assignedWorkerIds, workerId],
     }));
   }
 
@@ -92,8 +110,9 @@ export default function ProductionOrderForm({
       return;
     }
 
+    const { assignedWorkerIds, ...fields } = form;
     onSubmit({
-      ...form,
+      ...fields,
       productId: form.productId === 'none' ? null : form.productId,
       poNumber: form.poNumber.trim(),
       itemCode: form.itemCode.trim(),
@@ -101,6 +120,7 @@ export default function ProductionOrderForm({
       orderedQuantity: Number(form.orderedQuantity),
       workerRate: Number(form.workerRate),
       notes: form.notes.trim(),
+      ...(canAssignWorkers && (!productionOrder || assignmentsChanged) && { assignedWorkerIds }),
     });
   }
 
@@ -170,6 +190,39 @@ export default function ProductionOrderForm({
               placeholder="Describe the garment or manufacturing work required"
             />
           </div>
+          {canAssignWorkers && (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Assigned Workers (optional)</Label>
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                {workers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No active workers are currently eligible for assignment.
+                  </p>
+                ) : (
+                  workers.map((worker) => (
+                    <label
+                      key={worker._id}
+                      className="flex cursor-pointer items-start gap-2 rounded-sm p-1 hover:bg-muted/50"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+                        checked={form.assignedWorkerIds.includes(String(worker._id))}
+                        onChange={() => toggleWorker(String(worker._id))}
+                      />
+                      <span className="text-sm">
+                        <span className="block font-medium">{worker.username}</span>
+                        <span className="block text-xs text-muted-foreground">{worker.email}</span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave empty to allow any eligible worker to record production.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

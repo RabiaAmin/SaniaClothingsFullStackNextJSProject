@@ -19,6 +19,10 @@ const productionOrderSchema = new mongoose.Schema(
       uppercase: true,
       maxlength: [80, 'Item code cannot exceed 80 characters'],
     },
+    assignedWorkers: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
+      default: [],
+    },
     client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
     productionDescription: {

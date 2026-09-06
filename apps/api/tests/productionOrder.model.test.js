@@ -31,7 +31,16 @@ test('production orders normalize globally unique PO keys and expose progress', 
   assert.equal(order.producedQuantity, 80);
   assert.equal(order.remainingQuantity, 40);
   assert.equal(order.progressPercentage, 67);
+  assert.deepEqual(order.assignedWorkers, []);
   assert.equal(ProductionOrder.schema.path('poNumber').options.unique, true);
+});
+
+test('production orders accept multiple optional worker assignments', async () => {
+  const workerIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
+  const order = validOrder({ assignedWorkers: workerIds });
+  await assert.doesNotReject(() => order.validate());
+  assert.deepEqual(order.assignedWorkers, workerIds);
+  assert.equal(ProductionOrder.schema.path('assignedWorkers').caster.options.ref, 'user');
 });
 
 test('production orders require an item code', async () => {

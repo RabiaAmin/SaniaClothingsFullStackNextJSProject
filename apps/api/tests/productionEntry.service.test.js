@@ -182,6 +182,62 @@ test('submission works without transactions and creates reviewer notifications',
   }
 });
 
+test('every assigned worker can submit production while unassigned workers are rejected', async () => {
+  const originals = {
+    orderFindById: ProductionOrder.findById,
+    entryCreate: ProductionEntry.create,
+    notify: notificationService.createNotificationsForAnyPermission,
+  };
+  const orderId = new mongoose.Types.ObjectId();
+  const assignedWorkerIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
+  const unassignedWorkerId = new mongoose.Types.ObjectId();
+  const createdFor = [];
+
+  ProductionOrder.findById = async () => ({
+    _id: orderId,
+    poNumber: 'PO-ASSIGNED',
+    assignedWorkers: assignedWorkerIds,
+    status: 'IN_PROGRESS',
+    orderedQuantity: 100,
+    workerRate: 10,
+  });
+  ProductionEntry.create = async (document) => {
+    createdFor.push(String(document.worker));
+    return { _id: new mongoose.Types.ObjectId(), ...document };
+  };
+  notificationService.createNotificationsForAnyPermission = async () => [];
+
+  try {
+    for (const workerId of assignedWorkerIds) {
+      await assert.doesNotReject(() =>
+        submitProductionEntry({
+          productionOrderId: orderId,
+          workerId,
+          workerName: 'Assigned worker',
+          date: new Date(),
+          quantity: 10,
+        })
+      );
+    }
+    await assert.rejects(
+      () =>
+        submitProductionEntry({
+          productionOrderId: orderId,
+          workerId: unassignedWorkerId,
+          workerName: 'Unassigned worker',
+          date: new Date(),
+          quantity: 10,
+        }),
+      (error) => error.statusCode === 403 && /not assigned/i.test(error.message)
+    );
+    assert.deepEqual(createdFor, assignedWorkerIds.map(String));
+  } finally {
+    ProductionOrder.findById = originals.orderFindById;
+    ProductionEntry.create = originals.entryCreate;
+    notificationService.createNotificationsForAnyPermission = originals.notify;
+  }
+});
+
 test('a notification failure does not report a persisted production claim as failed', async () => {
   const originals = {
     orderFindById: ProductionOrder.findById,
