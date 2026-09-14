@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Banknote, Eye } from 'lucide-react';
 import EmptyState from '@/components/admin/EmptyState';
 import PageHeader from '@/components/admin/PageHeader';
@@ -28,6 +28,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { usePayroll } from '@/hooks/usePayroll';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { getDefaultPayrollPeriod, isValidPayrollDateRange } from '@/lib/utils/payrollDates';
 
 function rangeValidationMessage(startDate, endDate) {
   if (!startDate || !endDate) return 'Start date and end date are required.';
@@ -59,13 +60,24 @@ function SummaryCard({ label, value, description }) {
   );
 }
 
-export default function PayrollPage() {
+function initialDateRange(searchParams) {
+  const providedRange = {
+    startDate: searchParams.get('startDate') ?? '',
+    endDate: searchParams.get('endDate') ?? '',
+  };
+  return isValidPayrollDateRange(providedRange.startDate, providedRange.endDate)
+    ? providedRange
+    : getDefaultPayrollPeriod();
+}
+
+function PayrollPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
   const canReadAll = hasPermission('payroll.read_all');
   const canViewPayroll = hasPermission('payroll.export_pdf');
-  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
-  const [selectedWorker, setSelectedWorker] = useState('all');
+  const [dateRange, setDateRange] = useState(() => initialDateRange(searchParams));
+  const [selectedWorker, setSelectedWorker] = useState(() => searchParams.get('workerId') || 'all');
   const validationMessage = rangeValidationMessage(dateRange.startDate, dateRange.endDate);
   const baseParams = { startDate: dateRange.startDate, endDate: dateRange.endDate };
   const allReport = usePayroll(baseParams, { enabled: !validationMessage });
@@ -309,5 +321,19 @@ export default function PayrollPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function PayrollPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <TableSkeleton rows={6} cols={7} />
+        </div>
+      }
+    >
+      <PayrollPageContent />
+    </Suspense>
   );
 }

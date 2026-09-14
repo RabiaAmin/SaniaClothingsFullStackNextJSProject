@@ -11,6 +11,7 @@ import { usePayrollPdfData } from '@/hooks/usePayroll';
 import { toast } from '@/hooks/useToast';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { createPdfFilename, exportElementToPdf, printElement } from '@/lib/utils/pdfExport';
+import { isValidPayrollDateRange } from '@/lib/utils/payrollDates';
 
 const PRINT_STYLES = `
   @media print {
@@ -59,12 +60,6 @@ const PRINT_STYLES = `
   }
 `;
 
-function validDateRange(startDate, endDate) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)
-    ? startDate <= endDate
-    : false;
-}
-
 function formatPeriodDate(value) {
   const parts = new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
@@ -93,7 +88,7 @@ function PayrollView() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const startDate = searchParams.get('startDate') ?? '';
   const endDate = searchParams.get('endDate') ?? '';
-  const hasValidFilters = Boolean(workerId) && validDateRange(startDate, endDate);
+  const hasValidFilters = Boolean(workerId) && isValidPayrollDateRange(startDate, endDate);
   const query = usePayrollPdfData({ workerId, startDate, endDate }, { enabled: hasValidFilters });
 
   const handlePrint = useCallback(async () => {
@@ -159,6 +154,7 @@ function PayrollView() {
   const rates = [...new Set(entries.map((entry) => Number(entry.unitRate) || 0))];
   const rateLabel = rates.length === 0 ? '—' : rates.map((rate) => formatCurrency(rate)).join(', ');
   const periodLabel = `${formatPeriodDate(startDate)} — ${formatPeriodDate(endDate)}`;
+  const backQuery = new URLSearchParams({ startDate, endDate, workerId }).toString();
 
   return (
     <>
@@ -166,7 +162,7 @@ function PayrollView() {
 
       <div className="mb-6 flex flex-wrap items-center gap-2 print:hidden">
         <Button asChild variant="outline" size="sm">
-          <Link href="/payroll">
+          <Link href={`/payroll?${backQuery}`}>
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </Button>
@@ -218,7 +214,6 @@ function PayrollView() {
           </div>
         </div>
 
-
         <h2 className="mb-2 text-lg font-bold">Approved Entry Audit</h2>
         {entries.length === 0 ? (
           <EmptyState
@@ -245,7 +240,7 @@ function PayrollView() {
                   <td className="border border-gray-300 px-3 py-2 font-mono font-semibold">
                     {entry.poNumber}
                   </td>
-               
+
                   <td className="border border-gray-300 px-3 py-2 text-right tabular-nums">
                     {entry.quantity}
                   </td>

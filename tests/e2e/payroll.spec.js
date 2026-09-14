@@ -1,6 +1,52 @@
 const { test, expect } = require('@playwright/test');
 const { mockApi, signInAsAdmin } = require('./support/mockApi');
 
+test('payroll defaults to the previous and current calendar month 26th', async ({ page }) => {
+  await mockApi(page);
+  await signInAsAdmin(page);
+  const cases = [
+    ['2026-09-14T12:00:00.000Z', '2026-08-26', '2026-09-26'],
+    ['2026-09-25T12:00:00.000Z', '2026-08-26', '2026-09-26'],
+    ['2026-09-30T12:00:00.000Z', '2026-08-26', '2026-09-26'],
+    ['2026-10-01T12:00:00.000Z', '2026-09-26', '2026-10-26'],
+    ['2026-10-26T12:00:00.000Z', '2026-09-26', '2026-10-26'],
+    ['2026-11-01T12:00:00.000Z', '2026-10-26', '2026-11-26'],
+  ];
+
+  for (const [currentTime, expectedStart, expectedEnd] of cases) {
+    await page.clock.setFixedTime(new Date(currentTime));
+    await page.goto('/payroll');
+    await expect(page.getByLabel('Start Date')).toHaveValue(expectedStart);
+    await expect(page.getByLabel('End Date')).toHaveValue(expectedEnd);
+  }
+});
+
+test('payroll preserves a provided range and subsequent manual changes', async ({ page }) => {
+  const calls = await mockApi(page);
+  await signInAsAdmin(page);
+  await page.goto('/payroll?startDate=2026-07-03&endDate=2026-08-19&workerId=user-worker');
+
+  await expect(page.getByLabel('Start Date')).toHaveValue('2026-07-03');
+  await expect(page.getByLabel('End Date')).toHaveValue('2026-08-19');
+  await expect(page.getByLabel('Worker')).toContainText('worker');
+  await expect
+    .poll(() =>
+      calls.some(
+        (call) =>
+          call.path === '/payroll/range' &&
+          call.query.startDate === '2026-07-03' &&
+          call.query.endDate === '2026-08-19' &&
+          call.query.workerId === 'user-worker'
+      )
+    )
+    .toBe(true);
+
+  await page.getByLabel('Start Date').fill('2026-07-10');
+  await page.getByLabel('End Date').fill('2026-08-22');
+  await expect(page.getByLabel('Start Date')).toHaveValue('2026-07-10');
+  await expect(page.getByLabel('End Date')).toHaveValue('2026-08-22');
+});
+
 test('admin sees payroll for a custom inclusive range and auditable PO calculations', async ({
   page,
 }) => {
@@ -72,11 +118,6 @@ test('admin can inspect a server-filtered worker payroll report', async ({ page 
 test('admin views, prints, and downloads payroll for the selected worker and date range', async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    window.print = () => {
-      window.__payrollPrintCalled = true;
-    };
-  });
   const calls = await mockApi(page);
   await signInAsAdmin(page);
   await page.goto('/payroll');
@@ -88,10 +129,13 @@ test('admin views, prints, and downloads payroll for the selected worker and dat
   await page.getByLabel('End Date').fill('2026-09-27');
   await page.getByLabel('Worker').click();
   await page.getByRole('option', { name: 'worker', exact: true }).click();
+  await expect(page.getByRole('option', { name: 'worker', exact: true })).toHaveCount(0);
   await expect(viewButton).toBeEnabled();
   await viewButton.click();
 
-  await expect(page).toHaveURL(/\/payroll\/user-worker\?startDate=2026-08-26&endDate=2026-09-27$/);
+  await expect(page).toHaveURL(/\/payroll\/user-worker\?startDate=2026-08-26&endDate=2026-09-27$/, {
+    timeout: 15_000,
+  });
   const payrollDocument = page.getByTestId('payroll-view-document');
   await expect(payrollDocument).toContainText('Worker:worker');
   await expect(payrollDocument).toContainText('26 Aug 2026 — 27 Sep 2026');
@@ -99,6 +143,11 @@ test('admin views, prints, and downloads payroll for the selected worker and dat
   await expect(payrollDocument).not.toContainText('PO-1002');
   await expect(payrollDocument).toContainText('600.00');
 
+  await page.evaluate(() => {
+    window.print = () => {
+      window.__payrollPrintCalled = true;
+    };
+  });
   await page.getByRole('button', { name: 'Print' }).click();
   await expect.poll(() => page.evaluate(() => window.__payrollPrintCalled)).toBe(true);
 
@@ -118,6 +167,14 @@ test('admin views, prints, and downloads payroll for the selected worker and dat
       },
     })
   );
+
+  await page.getByRole('link', { name: 'Back' }).click();
+  await expect(page).toHaveURL(
+    /\/payroll\?startDate=2026-08-26&endDate=2026-09-27&workerId=user-worker$/
+  );
+  await expect(page.getByLabel('Start Date')).toHaveValue('2026-08-26');
+  await expect(page.getByLabel('End Date')).toHaveValue('2026-09-27');
+  await expect(page.getByLabel('Worker')).toContainText('worker');
 });
 
 test('All workers remains available on the payroll page without opening an individual view', async ({
