@@ -38,6 +38,9 @@ import {
 import { useClients } from '@/hooks/useClients';
 import { useAuth } from '@/hooks/useAuth';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
+import { WorkerCardSkeleton, WorkerOrderCard } from '@/components/worker/WorkerMobileCards';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import {
   PRODUCTION_ORDER_STATUSES,
@@ -126,12 +129,18 @@ function InvoiceRelationship({ relationship }) {
 }
 
 export default function ProductionOrdersPage() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canReadInvoices = hasPermission('invoice.read');
+  const isWorkerView =
+    hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const showWorkerMobile = isWorkerView && isMobile;
+  const canRecordProduction = hasPermission('production_entry.create');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [clientId, setClientId] = useState('all');
   const [page, setPage] = useState(1);
+  const [workOrder, setWorkOrder] = useState(null);
   const deferredSearch = useDeferredValue(search);
   const params = {
     page,
@@ -143,6 +152,12 @@ export default function ProductionOrdersPage() {
   const { data, isLoading, error } = useProductionOrders(params);
   const { data: clientData } = useClients({ enabled: hasPermission('client.read') });
   const orders = data?.productionOrders ?? [];
+  const assignedOrders = orders.filter((order) =>
+    (order.assignedWorkers ?? []).some(
+      (worker) => String(worker?._id ?? worker) === String(user?._id)
+    )
+  );
+  const availableOrders = orders.filter((order) => (order.assignedWorkers ?? []).length === 0);
 
   function resetPage(callback) {
     callback();
@@ -189,19 +204,21 @@ export default function ProductionOrdersPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={clientId} onValueChange={(value) => resetPage(() => setClientId(value))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All clients" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All clients</SelectItem>
-              {(clientData?.clients ?? []).map((client) => (
-                <SelectItem key={client._id} value={client._id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className={showWorkerMobile ? 'hidden' : ''}>
+            <Select value={clientId} onValueChange={(value) => resetPage(() => setClientId(value))}>
+              <SelectTrigger>
+                <SelectValue placeholder="All clients" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All clients</SelectItem>
+                {(clientData?.clients ?? []).map((client) => (
+                  <SelectItem key={client._id} value={client._id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
 
@@ -209,88 +226,155 @@ export default function ProductionOrdersPage() {
         <span>{data?.totalRecords ?? 0} production orders</span>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
+      {showWorkerMobile && (
+        <div className="space-y-6" aria-live="polite">
           {isLoading ? (
-            <div className="p-6">
-              <TableSkeleton rows={6} cols={canReadInvoices ? 9 : 8} />
+            <div className="space-y-3">
+              <WorkerCardSkeleton />
             </div>
           ) : error ? (
-            <p className="p-6 text-sm text-destructive">{error.message}</p>
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {error.message}
+            </p>
           ) : orders.length === 0 ? (
             <EmptyState
               icon={ClipboardList}
               title="No production orders found"
-              description="Create a production order or adjust the current filters."
-              className="m-6"
+              description="Adjust the current filters to find available work."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Production deadline</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Progress</TableHead>
-                  {canReadInvoices && <TableHead>Invoice</TableHead>}
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order._id}>
-                    <TableCell className="font-mono font-semibold">{order.poNumber}</TableCell>
-                    <TableCell>{order.client?.name ?? 'Unknown client'}</TableCell>
-                    <TableCell className="max-w-64 truncate">
-                      {order.productionDescription}
-                    </TableCell>
-                    <TableCell>
-                      <DeadlineSummary order={order} />
-                    </TableCell>
-                    <TableCell>{formatCurrency(order.workerRate)}</TableCell>
-                    <TableCell>
-                      <ProductionStatus order={order} />
-                    </TableCell>
-                    <TableCell>
-                      <ProgressSummary order={order} />
-                    </TableCell>
-                    {canReadInvoices && (
-                      <TableCell>
-                        <InvoiceRelationship relationship={order.invoiceRelationship} />
+            <>
+              <section className="space-y-3" aria-labelledby="assigned-orders-heading">
+                <div>
+                  <h2 id="assigned-orders-heading" className="font-semibold">
+                    My Assigned Orders
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Work specifically assigned to you</p>
+                </div>
+                {assignedOrders.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    No production orders are assigned to you.
+                  </p>
+                ) : (
+                  assignedOrders.map((order) => (
+                    <WorkerOrderCard
+                      key={order._id}
+                      order={order}
+                      onAddWork={canRecordProduction ? setWorkOrder : undefined}
+                    />
+                  ))
+                )}
+              </section>
+              <section className="space-y-3" aria-labelledby="available-orders-heading">
+                <div>
+                  <h2 id="available-orders-heading" className="font-semibold">
+                    Available Orders
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Unassigned work you can record</p>
+                </div>
+                {availableOrders.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    No unassigned production orders are available.
+                  </p>
+                ) : (
+                  availableOrders.map((order) => (
+                    <WorkerOrderCard
+                      key={order._id}
+                      order={order}
+                      onAddWork={canRecordProduction ? setWorkOrder : undefined}
+                    />
+                  ))
+                )}
+              </section>
+            </>
+          )}
+        </div>
+      )}
+
+      {!showWorkerMobile && (
+        <Card>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-6">
+                <TableSkeleton rows={6} cols={canReadInvoices ? 9 : 8} />
+              </div>
+            ) : error ? (
+              <p className="p-6 text-sm text-destructive">{error.message}</p>
+            ) : orders.length === 0 ? (
+              <EmptyState
+                icon={ClipboardList}
+                title="No production orders found"
+                description="Create a production order or adjust the current filters."
+                className="m-6"
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>PO Number</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Production deadline</TableHead>
+                    <TableHead>Rate</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Progress</TableHead>
+                    {canReadInvoices && <TableHead>Invoice</TableHead>}
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.map((order) => (
+                    <TableRow key={order._id}>
+                      <TableCell className="font-mono font-semibold">{order.poNumber}</TableCell>
+                      <TableCell>{order.client?.name ?? 'Unknown client'}</TableCell>
+                      <TableCell className="max-w-64 truncate">
+                        {order.productionDescription}
                       </TableCell>
-                    )}
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button asChild variant="ghost" size="icon">
-                          <Link
-                            href={`/production-orders/${order._id}`}
-                            aria-label={`View ${order.poNumber}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <PermissionGuard permission="production_order.update">
+                      <TableCell>
+                        <DeadlineSummary order={order} />
+                      </TableCell>
+                      <TableCell>{formatCurrency(order.workerRate)}</TableCell>
+                      <TableCell>
+                        <ProductionStatus order={order} />
+                      </TableCell>
+                      <TableCell>
+                        <ProgressSummary order={order} />
+                      </TableCell>
+                      {canReadInvoices && (
+                        <TableCell>
+                          <InvoiceRelationship relationship={order.invoiceRelationship} />
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
                           <Button asChild variant="ghost" size="icon">
                             <Link
-                              href={`/production-orders/${order._id}/edit`}
-                              aria-label={`Edit ${order.poNumber}`}
+                              href={`/production-orders/${order._id}`}
+                              aria-label={`View ${order.poNumber}`}
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Link>
                           </Button>
-                        </PermissionGuard>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                          <PermissionGuard permission="production_order.update">
+                            <Button asChild variant="ghost" size="icon">
+                              <Link
+                                href={`/production-orders/${order._id}/edit`}
+                                aria-label={`Edit ${order.poNumber}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </PermissionGuard>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {(data?.totalPages ?? 1) > 1 && (
         <div className="flex items-center justify-center gap-2">
@@ -315,6 +399,12 @@ export default function ProductionOrdersPage() {
           </Button>
         </div>
       )}
+
+      <ProductionEntryFormDialog
+        open={Boolean(workOrder)}
+        onOpenChange={(nextOpen) => !nextOpen && setWorkOrder(null)}
+        initialProductionOrderId={workOrder?._id}
+      />
     </div>
   );
 }

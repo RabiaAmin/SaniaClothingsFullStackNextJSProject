@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import { Check, ClipboardCheck, Pencil, Plus, Search, X } from 'lucide-react';
 import PermissionGuard from '@/components/auth/PermissionGuard';
 import EmptyState from '@/components/admin/EmptyState';
@@ -29,20 +29,38 @@ import {
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
 import { useProductionEntries } from '@/hooks/useProductionEntries';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
   PRODUCTION_ENTRY_STATUSES,
   productionEntryStatusLabel,
   productionEntryStatusVariant,
 } from '@/lib/productionEntries';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { WorkerCardSkeleton, WorkerEntryCard } from '@/components/worker/WorkerMobileCards';
 
-function SummaryCard({ label, value, description }) {
+function SummaryCard({ label, value, description, compact = false }) {
   return (
     <Card>
-      <CardContent className="p-4">
+      <CardContent className={compact ? 'p-3 sm:p-4' : 'p-4'}>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        <p
+          className={
+            compact
+              ? 'mt-1 text-lg font-semibold tabular-nums sm:text-2xl'
+              : 'mt-1 text-2xl font-semibold tabular-nums'
+          }
+        >
+          {value}
+        </p>
+        <p
+          className={
+            compact
+              ? 'mt-1 hidden text-xs text-muted-foreground sm:block'
+              : 'mt-1 text-xs text-muted-foreground'
+          }
+        >
+          {description}
+        </p>
       </CardContent>
     </Card>
   );
@@ -50,6 +68,10 @@ function SummaryCard({ label, value, description }) {
 
 export default function ProductionEntriesPage() {
   const { user, hasPermission } = useAuth();
+  const isWorkerView =
+    hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const showWorkerMobile = isWorkerView && isMobile;
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
@@ -66,6 +88,19 @@ export default function ProductionEntriesPage() {
   const { data, isLoading, error } = useProductionEntries(params);
   const entries = data?.productionEntries ?? [];
   const stats = data?.stats ?? {};
+
+  useEffect(() => {
+    function openEntryForm() {
+      setFormOpen(true);
+      if (window.location.search.includes('record=true')) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+
+    window.addEventListener('open-production-entry', openEntryForm);
+    if (new URLSearchParams(window.location.search).get('record') === 'true') openEntryForm();
+    return () => window.removeEventListener('open-production-entry', openEntryForm);
+  }, []);
 
   function canEdit(entry) {
     if (entry.status !== 'PENDING') return false;
@@ -95,28 +130,34 @@ export default function ProductionEntriesPage() {
         }
         action={
           <PermissionGuard permission="production_entry.create">
-            <Button onClick={() => setFormOpen(true)}>
+            <Button
+              className={showWorkerMobile ? 'h-11 w-full sm:w-auto' : ''}
+              onClick={() => setFormOpen(true)}
+            >
               <Plus className="h-4 w-4" /> Record Production
             </Button>
           </PermissionGuard>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={showWorkerMobile ? 'grid grid-cols-3 gap-2' : 'grid gap-4 sm:grid-cols-3'}>
         <SummaryCard
           label="Pending review"
           value={stats.pendingEntries ?? 0}
           description="Entries not yet counted"
+          compact={showWorkerMobile}
         />
         <SummaryCard
           label="Approved pieces"
           value={stats.approvedQuantity ?? 0}
           description="Counted toward production"
+          compact={showWorkerMobile}
         />
         <SummaryCard
           label="Approved earnings"
           value={formatCurrency(stats.approvedAmount ?? 0)}
           description="Based on snapshotted rates"
+          compact={showWorkerMobile}
         />
       </div>
 
@@ -151,124 +192,152 @@ export default function ProductionEntriesPage() {
         <span>{data?.totalRecords ?? 0} production entries</span>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
+      {showWorkerMobile && (
+        <div className="space-y-3" aria-live="polite">
           {isLoading ? (
-            <div className="p-6">
-              <TableSkeleton rows={6} cols={8} />
-            </div>
+            <WorkerCardSkeleton />
           ) : error ? (
-            <p className="p-6 text-sm text-destructive">{error.message}</p>
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {error.message}
+            </p>
           ) : entries.length === 0 ? (
             <EmptyState
               icon={ClipboardCheck}
               title="No production entries found"
               description="Record production or adjust the current filters."
-              className="m-6"
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Worker</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Unit Rate</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.map((entry) => (
-                  <TableRow key={entry._id}>
-                    <TableCell>{formatDate(entry.date)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-mono font-semibold">
-                          {entry.productionOrder?.poNumber ?? 'Unknown PO'}
-                        </p>
-                        <p className="max-w-48 truncate text-xs text-muted-foreground">
-                          {entry.productionOrder?.productionDescription}
-                        </p>
-                        {entry.notes && (
-                          <p className="max-w-48 truncate text-xs text-muted-foreground">
-                            Note: {entry.notes}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {entry.worker?.username ?? entry.worker?.email ?? 'Unknown'}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {entry.quantity}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(entry.unitRate)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {formatCurrency(entry.totalAmount)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Badge variant={productionEntryStatusVariant(entry.status)}>
-                          {productionEntryStatusLabel(entry.status)}
-                        </Badge>
-                        {entry.reviewedBy && (
-                          <p className="text-xs text-muted-foreground">
-                            by {entry.reviewedBy.username ?? entry.reviewedBy.email}
-                          </p>
-                        )}
-                        {entry.reviewNotes && (
-                          <p className="max-w-40 truncate text-xs text-muted-foreground">
-                            {entry.reviewNotes}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {canEdit(entry) && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Edit entry for ${entry.productionOrder?.poNumber}`}
-                            onClick={() => setEditingEntry(entry)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canReview(entry, 'production_entry.approve') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Approve entry for ${entry.productionOrder?.poNumber}`}
-                            onClick={() => setReview({ entry, decision: 'APPROVED' })}
-                          >
-                            <Check className="h-4 w-4 text-emerald-600" />
-                          </Button>
-                        )}
-                        {canReview(entry, 'production_entry.reject') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Reject entry for ${entry.productionOrder?.poNumber}`}
-                            onClick={() => setReview({ entry, decision: 'REJECTED' })}
-                          >
-                            <X className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            entries.map((entry) => (
+              <WorkerEntryCard
+                key={entry._id}
+                entry={entry}
+                onEdit={canEdit(entry) ? setEditingEntry : undefined}
+              />
+            ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
+
+      {!showWorkerMobile && (
+        <Card>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-6">
+                <TableSkeleton rows={6} cols={8} />
+              </div>
+            ) : error ? (
+              <p className="p-6 text-sm text-destructive">{error.message}</p>
+            ) : entries.length === 0 ? (
+              <EmptyState
+                icon={ClipboardCheck}
+                title="No production entries found"
+                description="Record production or adjust the current filters."
+                className="m-6"
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>PO Number</TableHead>
+                    <TableHead>Worker</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Unit Rate</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <TableRow key={entry._id}>
+                      <TableCell>{formatDate(entry.date)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-mono font-semibold">
+                            {entry.productionOrder?.poNumber ?? 'Unknown PO'}
+                          </p>
+                          <p className="max-w-48 truncate text-xs text-muted-foreground">
+                            {entry.productionOrder?.productionDescription}
+                          </p>
+                          {entry.notes && (
+                            <p className="max-w-48 truncate text-xs text-muted-foreground">
+                              Note: {entry.notes}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {entry.worker?.username ?? entry.worker?.email ?? 'Unknown'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {entry.quantity}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(entry.unitRate)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {formatCurrency(entry.totalAmount)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant={productionEntryStatusVariant(entry.status)}>
+                            {productionEntryStatusLabel(entry.status)}
+                          </Badge>
+                          {entry.reviewedBy && (
+                            <p className="text-xs text-muted-foreground">
+                              by {entry.reviewedBy.username ?? entry.reviewedBy.email}
+                            </p>
+                          )}
+                          {entry.reviewNotes && (
+                            <p className="max-w-40 truncate text-xs text-muted-foreground">
+                              {entry.reviewNotes}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {canEdit(entry) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Edit entry for ${entry.productionOrder?.poNumber}`}
+                              onClick={() => setEditingEntry(entry)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canReview(entry, 'production_entry.approve') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Approve entry for ${entry.productionOrder?.poNumber}`}
+                              onClick={() => setReview({ entry, decision: 'APPROVED' })}
+                            >
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            </Button>
+                          )}
+                          {canReview(entry, 'production_entry.reject') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Reject entry for ${entry.productionOrder?.poNumber}`}
+                              onClick={() => setReview({ entry, decision: 'REJECTED' })}
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {(data?.totalPages ?? 1) > 1 && (
         <div className="flex items-center justify-center gap-2">

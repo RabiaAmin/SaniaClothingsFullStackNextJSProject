@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -36,6 +37,7 @@ import { useClients } from '@/hooks/useClients';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useNotifications } from '@/hooks/useNotifications';
 import { usePayroll } from '@/hooks/usePayroll';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useProductionEntries } from '@/hooks/useProductionEntries';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { notificationTarget, notificationTypeLabel } from '@/lib/notifications';
@@ -47,6 +49,12 @@ import {
   productionOrderTracking,
 } from '@/lib/productionOrders';
 import { formatCurrency, formatDate, formatRelativeTime } from '@/lib/utils/formatters';
+import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
+import {
+  WorkerCardSkeleton,
+  WorkerEntryCard,
+  WorkerOrderCard,
+} from '@/components/worker/WorkerMobileCards';
 
 function monthParams() {
   const now = new Date();
@@ -512,6 +520,8 @@ function WorkerOrdersCard({ title, orders, isLoading, emptyMessage }) {
 }
 
 function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQuery, userId }) {
+  const [workOrder, setWorkOrder] = useState(null);
+  const showWorkerMobile = useMediaQuery('(max-width: 767px)');
   const entries = entriesQuery.data?.productionEntries ?? [];
   const stats = entriesQuery.data?.stats ?? {};
   const orders = (ordersQuery.data?.productionOrders ?? []).filter(
@@ -527,143 +537,198 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
     .reduce((sum, entry) => sum + (entry.totalAmount ?? 0), 0);
   const approvedEarnings =
     payrollQuery.data?.report?.summary?.totalEarnings ?? stats.approvedAmount ?? 0;
+  const urgentOrders = orders.filter((order) =>
+    ['DUE_SOON', 'OVERDUE'].includes(productionOrderTracking(order).deadlineStatus)
+  );
 
   return (
-    <section className="space-y-4" data-testid="worker-dashboard">
-      <SectionHeader
-        title="My production"
-        description="Your current-month pieces, entry status, earnings, and available work"
-        href="/production-entries"
-        label="View my entries"
-      />
-      <ErrorMessage queries={[entriesQuery, ordersQuery, payrollQuery, notificationsQuery]} />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Stat
-          label="Monthly pieces"
-          value={entriesQuery.isLoading ? '—' : (stats.submittedQuantity ?? 0)}
-          description="All submitted pieces"
-          icon={Shirt}
-          highlight
-        />
-        <Stat
-          label="Approved pieces"
-          value={entriesQuery.isLoading ? '—' : (stats.approvedQuantity ?? 0)}
-          description={`${stats.approvedEntries ?? 0} approved entries`}
-          icon={CheckCircle2}
-        />
-        <Stat
-          label="Pending entries"
-          value={entriesQuery.isLoading ? '—' : (stats.pendingEntries ?? 0)}
-          description="Waiting for review"
-          icon={Clock3}
-        />
-        <Stat
-          label="Rejected entries"
-          value={entriesQuery.isLoading ? '—' : (stats.rejectedEntries ?? 0)}
-          description="Not counted"
-          icon={XCircle}
-        />
-        <Stat
-          label="Estimated earnings"
-          value={entriesQuery.isLoading ? '—' : formatCurrency(estimated)}
-          description="Pending; not yet approved"
-          icon={DollarSign}
-        />
-        <Stat
-          label="Approved earnings"
-          value={payrollQuery.isLoading ? '—' : formatCurrency(approvedEarnings)}
-          description="Approved entries only"
-          icon={Banknote}
-        />
-      </div>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Recent submitted entries</CardTitle>
-          <Button asChild size="sm">
-            <Link href="/production-entries">
-              <Plus className="h-4 w-4" /> Record production
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          {entriesQuery.isLoading ? (
-            <div className="px-6 pb-6">
-              <TableSkeleton rows={5} cols={5} />
+    <div data-testid="worker-dashboard">
+      {showWorkerMobile && (
+        <section className="space-y-5">
+          <div className="space-y-3">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">My production</h1>
+              <p className="text-sm text-muted-foreground">Your work, progress, and entry status</p>
             </div>
-          ) : entries.length === 0 ? (
-            <p className="px-6 pb-6 text-sm text-muted-foreground">
-              You have not submitted production this month.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>PO</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.slice(0, 5).map((entry) => (
-                  <TableRow key={entry._id}>
-                    <TableCell>{formatDate(entry.date)}</TableCell>
-                    <TableCell className="font-mono font-semibold">
-                      {entry.productionOrder?.poNumber}
-                    </TableCell>
-                    <TableCell>{entry.quantity}</TableCell>
-                    <TableCell>{formatCurrency(entry.totalAmount ?? 0)}</TableCell>
-                    <TableCell>
-                      <Badge variant={productionEntryStatusVariant(entry.status)}>
-                        {productionEntryStatusLabel(entry.status)}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      <div className="grid gap-6 xl:grid-cols-3">
-        <WorkerOrdersCard
-          title="My Assigned Orders"
-          orders={assignedOrders}
-          isLoading={ordersQuery.isLoading}
-          emptyMessage="No production orders are assigned to you."
-        />
-        <WorkerOrdersCard
-          title="Available production orders"
-          orders={availableOrders}
-          isLoading={ordersQuery.isLoading}
-          emptyMessage="No unassigned production orders are available."
-        />
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bell className="h-4 w-4" /> Notifications
-            </CardTitle>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/notifications">View all</Link>
+            <Button asChild className="h-12 w-full text-base">
+              <Link href="/production-entries?record=true">
+                <Plus className="h-5 w-5" /> Record Production
+              </Link>
             </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {notificationsQuery.isLoading ? (
-              <div className="h-32 animate-pulse rounded-lg bg-muted" />
-            ) : notifications.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No production notifications yet.</p>
+          </div>
+
+          <ErrorMessage queries={[entriesQuery, ordersQuery, payrollQuery, notificationsQuery]} />
+
+          <div className="grid grid-cols-2 gap-2">
+            <Card>
+              <CardContent className="p-3">
+                <ClipboardList className="h-4 w-4 text-primary" aria-hidden="true" />
+                <p className="mt-2 text-xl font-bold tabular-nums">
+                  {ordersQuery.isLoading ? '—' : orders.length}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Active orders</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <Shirt className="h-4 w-4 text-primary" aria-hidden="true" />
+                <p className="mt-2 text-xl font-bold tabular-nums">
+                  {entriesQuery.isLoading ? '—' : (stats.submittedQuantity ?? 0)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Monthly pieces</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <Clock3 className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                <p className="mt-2 text-xl font-bold tabular-nums">
+                  {entriesQuery.isLoading ? '—' : (stats.pendingEntries ?? 0)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Pending</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                <p className="mt-2 text-xl font-bold tabular-nums">
+                  {entriesQuery.isLoading ? '—' : (stats.approvedQuantity ?? 0)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Approved pieces</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="grid grid-cols-2 divide-x p-4">
+              <div className="pr-4">
+                <p className="text-xs text-muted-foreground">Estimated earnings</p>
+                <p className="mt-1 font-bold tabular-nums">
+                  {entriesQuery.isLoading ? '—' : formatCurrency(estimated)}
+                </p>
+              </div>
+              <div className="pl-4">
+                <p className="text-xs text-muted-foreground">Approved earnings</p>
+                <p className="mt-1 font-bold tabular-nums">
+                  {payrollQuery.isLoading ? '—' : formatCurrency(approvedEarnings)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {urgentOrders.length > 0 && (
+            <section className="space-y-3" aria-labelledby="urgent-work-heading">
+              <h2
+                id="urgent-work-heading"
+                className="flex items-center gap-2 font-semibold text-destructive"
+              >
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" /> Urgent work
+              </h2>
+              {urgentOrders.slice(0, 2).map((order) => (
+                <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
+              ))}
+            </section>
+          )}
+
+          <section className="space-y-3" aria-labelledby="mobile-assigned-orders-heading">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <h2 id="mobile-assigned-orders-heading" className="font-semibold">
+                  My Assigned Orders
+                </h2>
+                <p className="text-sm text-muted-foreground">Your priority work</p>
+              </div>
+              <Link href="/production-orders" className="text-sm font-medium text-primary">
+                View all
+              </Link>
+            </div>
+            {ordersQuery.isLoading ? (
+              <WorkerCardSkeleton count={1} />
+            ) : assignedOrders.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No production orders are assigned to you.
+              </p>
             ) : (
-              notifications.slice(0, 4).map((notification) => (
+              assignedOrders
+                .slice(0, 2)
+                .map((order) => (
+                  <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
+                ))
+            )}
+          </section>
+
+          <section className="space-y-3" aria-labelledby="mobile-available-orders-heading">
+            <h2 id="mobile-available-orders-heading" className="font-semibold">
+              Available Orders
+            </h2>
+            <p className="text-sm text-muted-foreground">Available production orders</p>
+            {ordersQuery.isLoading ? (
+              <WorkerCardSkeleton count={1} />
+            ) : availableOrders.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No unassigned production orders are available.
+              </p>
+            ) : (
+              availableOrders
+                .slice(0, 2)
+                .map((order) => (
+                  <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
+                ))
+            )}
+          </section>
+
+          <section className="space-y-3" aria-labelledby="recent-work-heading">
+            <div className="flex items-end justify-between gap-3">
+              <h2 id="recent-work-heading" className="font-semibold">
+                Recent production
+              </h2>
+              <Link href="/production-entries" className="text-sm font-medium text-primary">
+                View history
+              </Link>
+            </div>
+            {entriesQuery.isLoading ? (
+              <WorkerCardSkeleton count={1} />
+            ) : entries.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                You have not submitted production this month.
+              </p>
+            ) : (
+              entries
+                .slice(0, 3)
+                .map((entry) => (
+                  <WorkerEntryCard key={entry._id} entry={entry} showItemCode={false} />
+                ))
+            )}
+          </section>
+
+          <section className="space-y-3" aria-labelledby="worker-notifications-heading">
+            <div className="flex items-end justify-between gap-3">
+              <h2
+                id="worker-notifications-heading"
+                className="flex items-center gap-2 font-semibold"
+              >
+                <Bell className="h-4 w-4" aria-hidden="true" /> Notifications
+              </h2>
+              <Link href="/notifications" className="text-sm font-medium text-primary">
+                View all
+              </Link>
+            </div>
+            {notificationsQuery.isLoading ? (
+              <div className="h-24 animate-pulse rounded-lg bg-muted" />
+            ) : notifications.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No production notifications yet.
+              </p>
+            ) : (
+              notifications.slice(0, 3).map((notification) => (
                 <Link
                   key={notification._id}
                   href={notificationTarget(notification)}
-                  className="flex gap-3 rounded-lg border p-3 hover:bg-muted/50"
+                  className="flex min-h-14 gap-3 rounded-lg border p-3 hover:bg-muted/50"
                 >
                   <span
                     className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead ? 'bg-muted-foreground/30' : 'bg-primary'}`}
                   />
-                  <span>
+                  <span className="min-w-0">
                     <span className="block text-xs font-medium text-muted-foreground">
                       {notificationTypeLabel(notification.type)} ·{' '}
                       {formatRelativeTime(notification.createdAt)}
@@ -673,10 +738,167 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
                 </Link>
               ))
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </section>
+          </section>
+        </section>
+      )}
+
+      {!showWorkerMobile && (
+        <section className="space-y-4">
+          <SectionHeader
+            title="My production"
+            description="Your current-month pieces, entry status, earnings, and available work"
+            href="/production-entries"
+            label="View my entries"
+          />
+          <ErrorMessage queries={[entriesQuery, ordersQuery, payrollQuery, notificationsQuery]} />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <Stat
+              label="Monthly pieces"
+              value={entriesQuery.isLoading ? '—' : (stats.submittedQuantity ?? 0)}
+              description="All submitted pieces"
+              icon={Shirt}
+              highlight
+            />
+            <Stat
+              label="Approved pieces"
+              value={entriesQuery.isLoading ? '—' : (stats.approvedQuantity ?? 0)}
+              description={`${stats.approvedEntries ?? 0} approved entries`}
+              icon={CheckCircle2}
+            />
+            <Stat
+              label="Pending entries"
+              value={entriesQuery.isLoading ? '—' : (stats.pendingEntries ?? 0)}
+              description="Waiting for review"
+              icon={Clock3}
+            />
+            <Stat
+              label="Rejected entries"
+              value={entriesQuery.isLoading ? '—' : (stats.rejectedEntries ?? 0)}
+              description="Not counted"
+              icon={XCircle}
+            />
+            <Stat
+              label="Estimated earnings"
+              value={entriesQuery.isLoading ? '—' : formatCurrency(estimated)}
+              description="Pending; not yet approved"
+              icon={DollarSign}
+            />
+            <Stat
+              label="Approved earnings"
+              value={payrollQuery.isLoading ? '—' : formatCurrency(approvedEarnings)}
+              description="Approved entries only"
+              icon={Banknote}
+            />
+          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Recent submitted entries</CardTitle>
+              <Button asChild size="sm">
+                <Link href="/production-entries">
+                  <Plus className="h-4 w-4" /> Record production
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {entriesQuery.isLoading ? (
+                <div className="px-6 pb-6">
+                  <TableSkeleton rows={5} cols={5} />
+                </div>
+              ) : entries.length === 0 ? (
+                <p className="px-6 pb-6 text-sm text-muted-foreground">
+                  You have not submitted production this month.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>PO</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.slice(0, 5).map((entry) => (
+                      <TableRow key={entry._id}>
+                        <TableCell>{formatDate(entry.date)}</TableCell>
+                        <TableCell className="font-mono font-semibold">
+                          {entry.productionOrder?.poNumber}
+                        </TableCell>
+                        <TableCell>{entry.quantity}</TableCell>
+                        <TableCell>{formatCurrency(entry.totalAmount ?? 0)}</TableCell>
+                        <TableCell>
+                          <Badge variant={productionEntryStatusVariant(entry.status)}>
+                            {productionEntryStatusLabel(entry.status)}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+          <div className="grid gap-6 xl:grid-cols-3">
+            <WorkerOrdersCard
+              title="My Assigned Orders"
+              orders={assignedOrders}
+              isLoading={ordersQuery.isLoading}
+              emptyMessage="No production orders are assigned to you."
+            />
+            <WorkerOrdersCard
+              title="Available production orders"
+              orders={availableOrders}
+              isLoading={ordersQuery.isLoading}
+              emptyMessage="No unassigned production orders are available."
+            />
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Bell className="h-4 w-4" /> Notifications
+                </CardTitle>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/notifications">View all</Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {notificationsQuery.isLoading ? (
+                  <div className="h-32 animate-pulse rounded-lg bg-muted" />
+                ) : notifications.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No production notifications yet.</p>
+                ) : (
+                  notifications.slice(0, 4).map((notification) => (
+                    <Link
+                      key={notification._id}
+                      href={notificationTarget(notification)}
+                      className="flex gap-3 rounded-lg border p-3 hover:bg-muted/50"
+                    >
+                      <span
+                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead ? 'bg-muted-foreground/30' : 'bg-primary'}`}
+                      />
+                      <span>
+                        <span className="block text-xs font-medium text-muted-foreground">
+                          {notificationTypeLabel(notification.type)} ·{' '}
+                          {formatRelativeTime(notification.createdAt)}
+                        </span>
+                        <span className="mt-0.5 block text-sm">{notification.message}</span>
+                      </span>
+                    </Link>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+
+      <ProductionEntryFormDialog
+        open={Boolean(workOrder)}
+        onOpenChange={(nextOpen) => !nextOpen && setWorkOrder(null)}
+        initialProductionOrderId={workOrder?._id}
+      />
+    </div>
   );
 }
 
@@ -742,24 +964,37 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Dashboard"
-        description={description}
-        action={
-          actions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {actions.map(({ href, label, icon: Icon }, index) => (
-                <Button key={href} asChild size="sm" variant={index === 0 ? 'default' : 'outline'}>
-                  <Link href={href}>
-                    <Icon className="h-4 w-4" /> {label}
-                  </Link>
-                </Button>
-              ))}
-            </div>
-          )
+      <div className={workerView ? 'hidden md:block' : ''}>
+        <PageHeader
+          title="Dashboard"
+          description={description}
+          action={
+            actions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {actions.map(({ href, label, icon: Icon }, index) => (
+                  <Button
+                    key={href}
+                    asChild
+                    size="sm"
+                    variant={index === 0 ? 'default' : 'outline'}
+                  >
+                    <Link href={href}>
+                      <Icon className="h-4 w-4" /> {label}
+                    </Link>
+                  </Button>
+                ))}
+              </div>
+            )
+          }
+        />
+      </div>
+      <div
+        className={
+          workerView
+            ? 'hidden flex-wrap items-center gap-2 text-sm md:flex'
+            : 'flex flex-wrap items-center gap-2 text-sm'
         }
-      />
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      >
         <span className="text-muted-foreground">Signed in as</span>
         <span className="font-medium">{user?.username ?? user?.email}</span>
         {user?.role?.name && <Badge variant="secondary">{user.role.name}</Badge>}

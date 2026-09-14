@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   FileText,
   Pencil,
+  Plus,
   Trash2,
   UserRound,
 } from 'lucide-react';
@@ -42,6 +43,8 @@ import {
   productionOrderTracking,
 } from '@/lib/productionOrders';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
+import { useAuth } from '@/hooks/useAuth';
 
 function Metric({ label, value, className = '' }) {
   return (
@@ -60,6 +63,10 @@ function formatOptionalDate(value) {
 export default function ProductionOrderDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { hasPermission } = useAuth();
+  const isWorkerView =
+    hasPermission('production_entry.create') && !hasPermission('production_entry.read_all');
+  const [entryOpen, setEntryOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const { data, isLoading, error } = useProductionOrder(id);
   const updateStatus = useUpdateProductionOrderStatus();
@@ -124,6 +131,11 @@ export default function ProductionOrderDetailPage() {
         description={order.productionDescription}
         action={
           <div className="flex flex-wrap gap-2">
+            {isWorkerView && tracking.remainingQuantity > 0 && tracking.status !== 'CANCELLED' && (
+              <Button className="h-11 flex-1 md:hidden" onClick={() => setEntryOpen(true)}>
+                <Plus className="h-4 w-4" /> Add Work
+              </Button>
+            )}
             <Button asChild variant="outline" size="sm">
               <Link href="/production-orders">
                 <ArrowLeft className="h-4 w-4" /> Back
@@ -389,6 +401,11 @@ export default function ProductionOrderDetailPage() {
         loading={deleteOrder.isPending}
         title="Delete production order?"
         description="Only orders without approved production can be deleted. This does not delete any invoice."
+      />
+      <ProductionEntryFormDialog
+        open={entryOpen}
+        onOpenChange={setEntryOpen}
+        initialProductionOrderId={order._id}
       />
     </div>
   );

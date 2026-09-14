@@ -29,8 +29,15 @@ import { formatCurrency } from '@/lib/utils/formatters';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function ProductionEntryFormDialog({ open, onOpenChange, entry = null }) {
-  const { user } = useAuth();
+export default function ProductionEntryFormDialog({
+  open,
+  onOpenChange,
+  entry = null,
+  initialProductionOrderId = '',
+}) {
+  const { user, hasPermission } = useAuth();
+  const isWorkerView =
+    hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
   const isEditing = Boolean(entry);
   const [productionOrderId, setProductionOrderId] = useState('');
   const [date, setDate] = useState(today());
@@ -59,11 +66,11 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
 
   useEffect(() => {
     if (!open) return;
-    setProductionOrderId(entry?.productionOrder?._id ?? '');
+    setProductionOrderId(entry?.productionOrder?._id ?? initialProductionOrderId);
     setDate(entry?.date?.slice(0, 10) ?? today());
     setQuantity(entry?.quantity?.toString() ?? '');
     setNotes(entry?.notes ?? '');
-  }, [entry, open]);
+  }, [entry, initialProductionOrderId, open]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -111,7 +118,13 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        className={
+          isWorkerView
+            ? 'max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg'
+            : ''
+        }
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit production entry' : 'Record production'}</DialogTitle>
           <DialogDescription>
@@ -132,7 +145,7 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
               />
             ) : (
               <Select value={productionOrderId} onValueChange={setProductionOrderId}>
-                <SelectTrigger id="entryProductionOrder">
+                <SelectTrigger id="entryProductionOrder" className={isWorkerView ? 'h-11' : ''}>
                   <SelectValue
                     placeholder={ordersLoading ? 'Loading orders...' : 'Select a production order'}
                   />
@@ -172,6 +185,7 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
                 required
+                className={isWorkerView ? 'h-11' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -184,6 +198,7 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}
                 required
+                className={isWorkerView ? 'h-14 text-lg font-semibold' : ''}
               />
             </div>
           </div>
@@ -199,11 +214,20 @@ export default function ProductionEntryFormDialog({ open, onOpenChange, entry = 
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className={isWorkerView ? 'gap-2' : ''}>
+            <Button
+              type="button"
+              variant="outline"
+              className={isWorkerView ? 'h-11 w-full sm:w-auto' : ''}
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button
+              type="submit"
+              className={isWorkerView ? 'h-11 w-full sm:w-auto' : ''}
+              disabled={mutation.isPending}
+            >
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEditing ? 'Save changes' : 'Submit for review'}
             </Button>
