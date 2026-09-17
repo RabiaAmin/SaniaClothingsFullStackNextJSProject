@@ -46,7 +46,7 @@ export function createPdfFilename(prefix, value) {
   return `${prefix}-${sanitizeFilenamePart(value)}.pdf`;
 }
 
-export async function exportElementToPdf(element, filename) {
+async function createPdfDocument(element) {
   if (!element || typeof window === 'undefined') {
     throw new Error('Printable content is not available.');
   }
@@ -120,8 +120,29 @@ export async function exportElementToPdf(element, filename) {
       pageIndex += 1;
     }
 
-    pdf.save(filename);
+    return pdf;
   } finally {
     clonedElement.remove();
   }
+}
+
+export async function createPdfBlob(element) {
+  const pdf = await createPdfDocument(element);
+  return pdf.output('blob');
+}
+
+export function downloadPdfBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+export async function exportElementToPdf(element, filename) {
+  const pdf = await createPdfDocument(element);
+  pdf.save(filename);
 }

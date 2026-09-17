@@ -7,7 +7,11 @@ export const INVOICE_KEYS = {
   all: ['invoices'],
   list: (params) => ['invoices', 'list', params],
   detail: (id) => ['invoices', 'detail', id],
-  statements: (params) => ['invoices', 'statements', params],
+  statementInvoices: (params) => ['invoices', 'statement-invoices', params],
+  statements: (invoiceIds) => ['invoices', 'statements', invoiceIds],
+  statementHistory: () => ['invoices', 'statement-history'],
+  statementHistoryList: (params) => ['invoices', 'statement-history', 'list', params],
+  statementHistoryDetail: (id) => ['invoices', 'statement-history', 'detail', id],
 };
 
 export function useInvoices(params = {}, options = {}) {
@@ -26,11 +30,62 @@ export function useInvoice(id) {
   });
 }
 
-export function useWeeklyStatements(params) {
+export function useStatementInvoices(params = {}) {
   return useQuery({
-    queryKey: INVOICE_KEYS.statements(params),
-    queryFn: () => invoiceApi.getWeeklyStatements(params).then((r) => r.data),
-    enabled: !!(params?.startDate && params?.endDate),
+    queryKey: INVOICE_KEYS.statementInvoices(params),
+    queryFn: () => invoiceApi.getStatementInvoices(params).then((r) => r.data),
+  });
+}
+
+export function useGeneratedStatements(invoiceIds) {
+  return useQuery({
+    queryKey: INVOICE_KEYS.statements(invoiceIds),
+    queryFn: () => invoiceApi.generateStatements({ invoiceIds }).then((r) => r.data),
+    enabled: invoiceIds.length > 0,
+    retry: false,
+  });
+}
+
+export function useGenerateStatements() {
+  return useMutation({
+    mutationFn: (invoiceIds) => invoiceApi.generateStatements({ invoiceIds }).then((r) => r.data),
+  });
+}
+
+export function useStatementHistory(params = {}) {
+  return useQuery({
+    queryKey: INVOICE_KEYS.statementHistoryList(params),
+    queryFn: () => invoiceApi.getStatementHistory(params).then((response) => response.data),
+  });
+}
+
+export function useStatementHistoryItem(id) {
+  return useQuery({
+    queryKey: INVOICE_KEYS.statementHistoryDetail(id),
+    queryFn: () => invoiceApi.getStatementHistoryById(id).then((response) => response.data),
+    enabled: !!id,
+    retry: false,
+  });
+}
+
+export function useCreateStatementHistory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceIds, pdfBlob, filename }) => {
+      const formData = new FormData();
+      formData.append('invoiceIds', JSON.stringify(invoiceIds));
+      formData.append('pdf', pdfBlob, filename);
+      return invoiceApi.createStatementHistory(formData).then((response) => response.data);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: INVOICE_KEYS.statementHistory() }),
+  });
+}
+
+export function useDeleteStatementHistory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => invoiceApi.deleteStatementHistory(id).then((response) => response.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: INVOICE_KEYS.statementHistory() }),
   });
 }
 

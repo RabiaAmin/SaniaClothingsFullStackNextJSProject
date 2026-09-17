@@ -12,7 +12,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Pencil, Trash2, Printer, AlertCircle, Download, Loader2 } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const PRINT_STYLES = `
   @media print {
@@ -68,6 +68,7 @@ export default function ViewInvoicePage() {
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [displayedDate, setDisplayedDate] = useState('');
   const printRef = useRef(null);
 
   const { data, isLoading, error } = useInvoice(id);
@@ -75,6 +76,10 @@ export default function ViewInvoicePage() {
 
   const invoice = data?.invoice ?? null;
   const bankAccount = data?.bankAccount ?? null;
+
+  useEffect(() => {
+    setDisplayedDate(formatDate(new Date()));
+  }, []);
 
   async function handleDelete() {
     try {
@@ -198,7 +203,7 @@ export default function ViewInvoicePage() {
             </div>
             <div className="flex border-b border-gray-300">
               <span className="w-32 border-r border-gray-300 px-3 py-2 font-bold">Date:</span>
-              <span className="px-3 py-2">{invoice.date ? formatDate(invoice.date) : '—'}</span>
+              <span className="px-3 py-2">{displayedDate || '—'}</span>
             </div>
             <div className="flex">
               <span className="w-32 border-r border-gray-300 px-3 py-2 font-bold">PO Number:</span>

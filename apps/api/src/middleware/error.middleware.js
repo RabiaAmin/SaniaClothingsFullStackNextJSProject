@@ -4,10 +4,15 @@ const errorHandler = (err, req, res, next) => {
 
   if (err.name === 'MulterError') {
     statusCode = 400;
+    const isStatementPdf = err.field === 'pdf';
     message =
       err.code === 'LIMIT_FILE_SIZE'
-        ? 'Image files cannot exceed 10 MB'
-        : 'Only supported image uploads are accepted';
+        ? isStatementPdf
+          ? 'Statement PDFs cannot exceed 15 MB'
+          : 'Image files cannot exceed 10 MB'
+        : isStatementPdf
+          ? 'Only PDF statement uploads are accepted'
+          : 'Only supported image uploads are accepted';
   }
 
   if (err.name === 'CastError') {

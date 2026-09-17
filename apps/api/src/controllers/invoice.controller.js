@@ -4,6 +4,7 @@ const BankAccount = require('../models/bankAccount.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { escapeRegex } = require('../utils/query');
 const { createInvoiceWithGeneratedNumber } = require('../services/invoiceNumber.service');
+const { generateInvoiceStatements } = require('../services/invoiceStatement.service');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
   const {
@@ -166,46 +167,40 @@ exports.getAllInvoices = asyncHandler(async (req, res) => {
   });
 });
 
-exports.getWeeklyStatements = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query;
+exports.getStatementInvoices = asyncHandler(async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 40));
+  const skip = (page - 1) * limit;
+  const filter = { status: 'Sent' };
 
-  if (!startDate || !endDate) {
-    return res
-      .status(400)
-      .json({ success: false, message: 'Start date and end date are required' });
-  }
-
-  const start = new Date(startDate);
-  const end = new Date(new Date(endDate).setHours(23, 59, 59, 999));
-
-  const statements = await Invoice.aggregate([
-    {
-      $match: {
-        status: 'Sent',
-        date: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $lookup: {
-        from: 'clients',
-        localField: 'toClient',
-        foreignField: '_id',
-        as: 'clientInfo',
-      },
-    },
-    { $unwind: '$clientInfo' },
-    {
-      $group: {
-        _id: '$clientInfo.name',
-        totalInvoices: { $sum: 1 },
-        totalAmount: { $sum: '$totalAmount' },
-        invoices: { $push: '$$ROOT' },
-      },
-    },
-    { $sort: { totalAmount: -1 } },
+  const [invoices, totalRecords] = await Promise.all([
+    Invoice.find(filter)
+      .populate('toClient', 'name')
+      .sort({ date: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit),
+    Invoice.countDocuments(filter),
   ]);
 
-  res.status(200).json({ success: true, statements });
+  res.status(200).json({
+    success: true,
+    invoices,
+    page,
+    totalPages: Math.max(1, Math.ceil(totalRecords / limit)),
+    totalRecords,
+  });
+});
+
+exports.generateStatements = asyncHandler(async (req, res) => {
+  try {
+    const statements = await generateInvoiceStatements(req.body?.invoiceIds);
+    res.status(200).json({ success: true, generatedAt: new Date().toISOString(), statements });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    throw error;
+  }
 });
 
 exports.markAsPaid = asyncHandler(async (req, res) => {

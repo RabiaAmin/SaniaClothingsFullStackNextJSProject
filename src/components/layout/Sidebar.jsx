@@ -22,12 +22,19 @@ import {
   ClipboardList,
   ClipboardCheck,
   Banknote,
+  History,
 } from 'lucide-react';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/invoices', label: 'Invoice Manager', icon: FileText, permission: 'invoice.read' },
+  {
+    href: '/invoices/statements/history',
+    label: 'Statement History',
+    icon: History,
+    permission: 'invoice.read',
+  },
   {
     href: '/production-orders',
     label: 'Production Orders',
@@ -88,6 +95,10 @@ export default function Sidebar({ open = false, onClose }) {
     ? `${user.firstName} ${user.lastName ?? ''}`.trim()
     : (user?.email ?? 'User');
 
+  const activeHref = NAV_ITEMS.filter(
+    ({ href }) => pathname === href || pathname.startsWith(`${href}/`)
+  ).sort((first, second) => second.href.length - first.href.length)[0]?.href;
+
   return (
     <aside
       className={cn(
@@ -122,7 +133,7 @@ export default function Sidebar({ open = false, onClose }) {
             (!permission || hasPermission(permission)) &&
             (!anyPermission || anyPermission.some(hasPermission))
         ).map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          const active = activeHref === href;
           return (
             <Link
               key={href}

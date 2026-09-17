@@ -13,5 +13,18 @@ const imageUpload = multer({
   },
 });
 
+const statementPdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter(req, file, callback) {
+    if (file.mimetype !== 'application/pdf') {
+      callback(new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname));
+      return;
+    }
+    callback(null, true);
+  },
+});
+
 module.exports = imageUpload.array('images', 10);
 module.exports.singleAvatar = imageUpload.single('avatar');
+module.exports.singleStatementPdf = statementPdfUpload.single('pdf');

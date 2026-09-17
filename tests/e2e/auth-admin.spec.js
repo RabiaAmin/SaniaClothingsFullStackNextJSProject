@@ -163,6 +163,34 @@ test('invoice view renders every business detail from the API response', async (
   await expect(invoice.getByText('hello@sania.test')).toBeVisible();
 });
 
+test('invoice view displays the current local date without updating the stored date', async ({
+  page,
+}) => {
+  const calls = await mockApi(page);
+  await signInAsAdmin(page);
+
+  await page.goto('/invoices/invoice-1');
+  const today = await page.evaluate(() =>
+    new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(new Date())
+  );
+  const invoice = page.locator('#invoice-print');
+
+  await expect(invoice.getByText(today, { exact: true })).toBeVisible();
+  await expect(invoice.getByText('Jun 1, 2026', { exact: true })).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.locator('#invoice-print').getByText(today, { exact: true })).toBeVisible();
+  expect(
+    calls.some(
+      (call) => call.method === 'PUT' && call.path === '/business/invoice/update/invoice-1'
+    )
+  ).toBe(false);
+});
+
 test('business profile displays and submits every API business field', async ({ page }) => {
   const calls = await mockApi(page);
   await signInAsAdmin(page);

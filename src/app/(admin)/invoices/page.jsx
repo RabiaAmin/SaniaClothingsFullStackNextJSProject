@@ -13,7 +13,7 @@ import InvoiceTable from '@/components/invoice/InvoiceTable';
 import InvoiceFilters from '@/components/invoice/InvoiceFilters';
 
 import { Button } from '@/components/ui/button';
-import { Plus, Send } from 'lucide-react';
+import { History, Plus, Send } from 'lucide-react';
 
 export default function InvoicesPage() {
   const { hasPermission } = useAuth();
@@ -88,11 +88,18 @@ export default function InvoicesPage() {
         <p className="text-sm text-muted-foreground">
           {data?.totalRecords != null ? `${data.totalRecords} invoices` : ''}
         </p>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/invoices/statements">
-            <Send className="h-4 w-4" /> Statements
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/invoices/statements/history">
+              <History className="h-4 w-4" /> Statement History
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/invoices/statements">
+              <Send className="h-4 w-4" /> Statements
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Table */}

@@ -3,13 +3,22 @@
 import { Suspense, useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useWeeklyStatements, useMarkAsPaid } from '@/hooks/useInvoices';
+import {
+  useCreateStatementHistory,
+  useGeneratedStatements,
+  useMarkAsPaid,
+} from '@/hooks/useInvoices';
 import { useClients } from '@/hooks/useClients';
 import { useFetch } from '@/hooks/useFetch';
 import businessApi from '@/lib/api/business.api';
 import { toast } from '@/hooks/useToast';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
-import { createPdfFilename, exportElementToPdf, printElement } from '@/lib/utils/pdfExport';
+import {
+  createPdfBlob,
+  createPdfFilename,
+  downloadPdfBlob,
+  printElement,
+} from '@/lib/utils/pdfExport';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,21 +76,17 @@ function StatementView() {
   const printRef = useRef(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const clientName = searchParams.get('client') ?? '';
-  const startDate = searchParams.get('startDate') ?? '';
-  const endDate = searchParams.get('endDate') ?? '';
+  const invoiceIds = searchParams.getAll('invoiceId');
 
   const {
     data: statementsData,
     isLoading: stLoading,
     error: stError,
-  } = useWeeklyStatements(
-    startDate && endDate
-      ? { startDate, endDate }
-      : { startDate: '1970-01-01', endDate: '1970-01-01' }
-  );
+  } = useGeneratedStatements(invoiceIds);
   const { data: bizRaw, isLoading: bizLoading } = useFetch(() => businessApi.getBusiness());
   const { data: clientsData } = useClients();
   const markAsPaid = useMarkAsPaid();
+  const createHistory = useCreateStatementHistory();
 
   const statements = statementsData?.statements ?? [];
   const statement = statements.find((s) => s._id === clientName);
@@ -114,16 +119,25 @@ function StatementView() {
 
     setIsGeneratingPdf(true);
     try {
-      await exportElementToPdf(printRef.current, createPdfFilename('statement', clientName));
+      const filename = createPdfFilename('statement', clientName);
+      const pdfBlob = await createPdfBlob(printRef.current);
+      const invoiceIdsForPdf = invoices.map((invoice) => invoice._id).filter(Boolean);
+      const result = await createHistory.mutateAsync({
+        invoiceIds: invoiceIdsForPdf,
+        pdfBlob,
+        filename,
+      });
+      downloadPdfBlob(pdfBlob, filename);
+      toast({ title: `${result.statement.statementNumber} saved to statement history` });
     } catch (err) {
       toast({
-        title: err?.message ?? 'PDF download failed',
+        title: err?.message ?? 'PDF generation or storage failed',
         variant: 'destructive',
       });
     } finally {
       setIsGeneratingPdf(false);
     }
-  }, [clientName]);
+  }, [clientName, createHistory, invoices]);
 
   if (stLoading || bizLoading) {
     return (
@@ -226,7 +240,8 @@ function StatementView() {
 
         {/* Date row */}
         <div className="mb-4 border border-gray-300 px-4 py-2.5 text-[13px]">
-          <span className="font-bold">Date:</span> {endDate ? formatDate(endDate) : '—'}
+          <span className="font-bold">Date:</span>{' '}
+          {statementsData?.generatedAt ? formatDate(statementsData.generatedAt) : '—'}
         </div>
 
         {/* Invoices table */}

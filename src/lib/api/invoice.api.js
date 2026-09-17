@@ -70,12 +70,30 @@ const invoiceApi = {
   markAsPaid: (payload) => axiosInstance.put(`${INVOICE}/mark-as-paid`, payload),
 
   /**
-   * GET /api/v1/business/invoice/weekly-statements — auth required
-   * Returns invoices with status "Sent", grouped by client name.
+   * GET /api/v1/business/invoice/statement-invoices — auth required
+   * Returns paginated Sent invoices available for statement generation.
    *
-   * @param {{ startDate: string, endDate: string }} params — both required (YYYY-MM-DD)
+   * @param {{ page?: number, limit?: number }} params
    */
-  getWeeklyStatements: (params) => axiosInstance.get(`${INVOICE}/weekly-statements`, { params }),
+  getStatementInvoices: (params) => axiosInstance.get(`${INVOICE}/statement-invoices`, { params }),
+
+  /**
+   * POST /api/v1/business/invoice/weekly-statements — auth required
+   * Retrieves selected invoices from the database and groups them by client.
+   * @param {{ invoiceIds: string[] }} payload
+   */
+  generateStatements: (payload) => axiosInstance.post(`${INVOICE}/weekly-statements`, payload),
+
+  createStatementHistory: (formData) =>
+    axiosInstance.post(`${INVOICE}/statement-history`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  getStatementHistory: (params) => axiosInstance.get(`${INVOICE}/statement-history`, { params }),
+
+  getStatementHistoryById: (id) => axiosInstance.get(`${INVOICE}/statement-history/${id}`),
+
+  deleteStatementHistory: (id) => axiosInstance.delete(`${INVOICE}/statement-history/${id}`),
 
   /**
    * GET /api/v1/business/invoice/getOrdersPerProduct — auth required

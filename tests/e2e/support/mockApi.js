@@ -104,6 +104,15 @@ const invoices = [
   },
 ];
 
+const statementInvoices = [
+  { ...invoices[0], toClient: clients[0] },
+  {
+    ...invoices[1],
+    status: 'Sent',
+    toClient: clients[1],
+  },
+];
+
 const user = {
   _id: 'user-1',
   username: 'admin',
@@ -262,6 +271,23 @@ async function mockApi(page, options = {}) {
   const calls = [];
   const currentUser = options.user ?? user;
   let sessionUser = currentUser;
+  let savedStatements = [
+    {
+      _id: 'statement-history-1',
+      statementNumber: 'STMT-20260917-ABC12345',
+      invoiceIds: [invoices[0]],
+      invoiceCount: 1,
+      clientName: 'Acme Retail',
+      startDate: '2026-06-01T10:00:00.000Z',
+      endDate: '2026-06-01T10:00:00.000Z',
+      generatedBy: { _id: user._id, username: user.username, email: user.email },
+      generatedAt: '2026-09-17T10:00:00.000Z',
+      pdf: {
+        url: 'https://example.test/saved-statement.pdf',
+        publicId: 'INVOICE_STATEMENTS/STMT-20260917-ABC12345',
+      },
+    },
+  ];
   let createdUser = null;
   let createdUserPassword = null;
   const managedUsers = [currentUser];
@@ -850,18 +876,68 @@ async function mockApi(page, options = {}) {
         bankAccount: bankAccounts[0],
       });
     }
-    if (method === 'GET' && path === '/business/invoice/weekly-statements') {
+    if (method === 'GET' && path === '/business/invoice/statement-invoices') {
       return response(route, {
         success: true,
-        statements: [
-          {
-            _id: 'Acme Retail',
-            totalInvoices: 1,
-            totalAmount: 1150,
-            invoices: [invoices[0]],
-          },
-        ],
+        invoices: statementInvoices,
+        page: 1,
+        totalPages: 1,
+        totalRecords: statementInvoices.length,
       });
+    }
+    if (method === 'POST' && path === '/business/invoice/weekly-statements') {
+      const payload = await readPayload(route);
+      const selected = statementInvoices.filter((invoice) =>
+        payload.invoiceIds.includes(invoice._id)
+      );
+      const grouped = Object.values(
+        selected.reduce((statements, invoice) => {
+          const clientName = invoice.toClient.name;
+          statements[clientName] ??= {
+            _id: clientName,
+            totalInvoices: 0,
+            totalAmount: 0,
+            invoices: [],
+          };
+          statements[clientName].totalInvoices += 1;
+          statements[clientName].totalAmount += invoice.totalAmount;
+          statements[clientName].invoices.push(invoice);
+          return statements;
+        }, {})
+      );
+      return response(route, {
+        success: true,
+        generatedAt: '2026-09-17T10:00:00.000Z',
+        statements: grouped,
+      });
+    }
+    if (method === 'GET' && path === '/business/invoice/statement-history') {
+      return response(route, {
+        success: true,
+        statements: savedStatements,
+        page: 1,
+        totalPages: 1,
+        totalRecords: savedStatements.length,
+      });
+    }
+    if (method === 'POST' && path === '/business/invoice/statement-history') {
+      return response(
+        route,
+        { success: true, statement: savedStatements[0], message: 'Statement PDF saved to history' },
+        201
+      );
+    }
+    if (method === 'GET' && path.startsWith('/business/invoice/statement-history/')) {
+      const id = path.split('/').pop();
+      const statement = savedStatements.find((item) => item._id === id);
+      return statement
+        ? response(route, { success: true, statement })
+        : response(route, { success: false, message: 'Statement not found' }, 404);
+    }
+    if (method === 'DELETE' && path.startsWith('/business/invoice/statement-history/')) {
+      const id = path.split('/').pop();
+      savedStatements = savedStatements.filter((item) => item._id !== id);
+      return response(route, { success: true, message: 'Statement deleted from history' });
     }
     if (method === 'POST' && path === '/business/invoice/create') {
       return response(route, { success: true, invoice: invoices[0] }, 201);
