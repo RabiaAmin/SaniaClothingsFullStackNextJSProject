@@ -1,83 +1,70 @@
 const Invoice = require('../models/invoice.model');
+const Counter = require('../models/counter.model');
 
-const MAX_GENERATION_ATTEMPTS = 10;
+const INVOICE_COUNTER_NAME = 'invoice';
+const INITIAL_INVOICE_COUNTER_VALUE = 862;
 
-function numericInvoiceNumberPipeline() {
-  return [
-    {
-      $project: {
-        numericInvoiceNumber: {
-          $convert: {
-            input: '$invoiceNumber',
-            to: 'double',
-            onError: null,
-            onNull: null,
-          },
-        },
-      },
-    },
-    {
-      $match: {
-        $expr: {
-          $and: [
-            { $ne: ['$numericInvoiceNumber', null] },
-            { $gte: ['$numericInvoiceNumber', 0] },
-            { $eq: ['$numericInvoiceNumber', { $trunc: '$numericInvoiceNumber' }] },
-          ],
-        },
-      },
-    },
-    { $sort: { numericInvoiceNumber: -1 } },
-    { $limit: 1 },
-  ];
-}
-
-async function generateInvoiceNumber(invoiceModel = Invoice) {
-  const [latest] = await invoiceModel.aggregate(numericInvoiceNumberPipeline());
-  if (!latest) return '1';
-
-  const highest = Number(latest.numericInvoiceNumber);
-  if (!Number.isSafeInteger(highest) || highest < 0 || highest >= Number.MAX_SAFE_INTEGER) {
-    throw new Error('Existing invoice number is outside the supported numeric range');
-  }
-
-  return String(highest + 1);
-}
-
-function isInvoiceNumberDuplicate(error) {
-  if (error?.code !== 11000) return false;
-
+function isCounterNameDuplicate(error) {
   return Boolean(
-    error.keyPattern?.invoiceNumber ||
-    Object.prototype.hasOwnProperty.call(error.keyValue ?? {}, 'invoiceNumber') ||
-    /invoiceNumber/i.test(error.message ?? '')
+    error?.code === 11000 &&
+    (error.keyPattern?.name ||
+      Object.prototype.hasOwnProperty.call(error.keyValue ?? {}, 'name') ||
+      /name/i.test(error.message ?? ''))
   );
 }
 
-async function createInvoiceWithGeneratedNumber(invoiceData, invoiceModel = Invoice) {
+async function initializeInvoiceCounter(counterModel = Counter) {
+  try {
+    return await counterModel.findOneAndUpdate(
+      { name: INVOICE_COUNTER_NAME },
+      {
+        $setOnInsert: {
+          name: INVOICE_COUNTER_NAME,
+          value: INITIAL_INVOICE_COUNTER_VALUE,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: false, runValidators: true }
+    );
+  } catch (error) {
+    // A concurrent first request may have inserted the unique counter first.
+    if (!isCounterNameDuplicate(error)) throw error;
+    return counterModel.findOne({ name: INVOICE_COUNTER_NAME });
+  }
+}
+
+async function generateInvoiceNumber(counterModel = Counter) {
+  await initializeInvoiceCounter(counterModel);
+
+  const counter = await counterModel.findOneAndUpdate(
+    { name: INVOICE_COUNTER_NAME },
+    { $inc: { value: 1 } },
+    { new: true, runValidators: true }
+  );
+
+  if (!counter || !Number.isSafeInteger(counter.value) || counter.value < 1) {
+    throw new Error('Invoice Counter returned an invalid value');
+  }
+
+  return String(counter.value);
+}
+
+async function createInvoiceWithGeneratedNumber(
+  invoiceData,
+  invoiceModel = Invoice,
+  counterModel = Counter
+) {
   const serverControlledData = { ...invoiceData };
   delete serverControlledData.invoiceNumber;
   delete serverControlledData.invNo;
 
-  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt += 1) {
-    const invoiceNumber = await generateInvoiceNumber(invoiceModel);
-
-    try {
-      return await invoiceModel.create({ ...serverControlledData, invoiceNumber });
-    } catch (error) {
-      if (!isInvoiceNumberDuplicate(error) || attempt === MAX_GENERATION_ATTEMPTS - 1) {
-        throw error;
-      }
-    }
-  }
-
-  throw new Error('Unable to generate a unique invoice number');
+  const invoiceNumber = await generateInvoiceNumber(counterModel);
+  return invoiceModel.create({ ...serverControlledData, invoiceNumber });
 }
 
 module.exports = {
-  MAX_GENERATION_ATTEMPTS,
-  numericInvoiceNumberPipeline,
+  INVOICE_COUNTER_NAME,
+  INITIAL_INVOICE_COUNTER_VALUE,
+  initializeInvoiceCounter,
   generateInvoiceNumber,
   createInvoiceWithGeneratedNumber,
-  isInvoiceNumberDuplicate,
 };
