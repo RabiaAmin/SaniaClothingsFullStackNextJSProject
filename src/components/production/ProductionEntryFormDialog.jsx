@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +36,7 @@ export default function ProductionEntryFormDialog({
   entry = null,
   initialProductionOrderId = '',
 }) {
+  const router = useRouter();
   const { user, hasPermission } = useAuth();
   const isWorkerView =
     hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
@@ -103,6 +105,7 @@ export default function ProductionEntryFormDialog({
           description: 'It will count toward production after approval.',
         });
       }
+      if (isWorkerView && !isEditing) router.push('/production-entries');
       onOpenChange(false);
     } catch (requestError) {
       toast({
@@ -147,13 +150,25 @@ export default function ProductionEntryFormDialog({
               <Select value={productionOrderId} onValueChange={setProductionOrderId}>
                 <SelectTrigger id="entryProductionOrder" className={isWorkerView ? 'h-11' : ''}>
                   <SelectValue
-                    placeholder={ordersLoading ? 'Loading orders...' : 'Select a production order'}
-                  />
+                    placeholder={ordersLoading ? 'Loading orders...' : 'Select an order'}
+                  >
+                    {selectedOrder
+                      ? `${selectedOrder.poNumber} - ${selectedOrder.productionDescription || selectedOrder.itemCode || 'Production item'}`
+                      : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {availableOrders.map((order) => (
-                    <SelectItem key={order._id} value={order._id}>
-                      {order.poNumber} - {order.itemCode || 'Item code unavailable'}
+                    <SelectItem key={order._id} value={order._id} className="py-2.5">
+                      <span className="flex flex-col pr-3 text-left">
+                        <span className="font-mono font-semibold">{order.poNumber}</span>
+                        <span className="max-w-72 truncate text-sm">
+                          {order.productionDescription || order.product?.name || 'Production item'}
+                        </span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          Item code: {order.itemCode || 'Unavailable'}
+                        </span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

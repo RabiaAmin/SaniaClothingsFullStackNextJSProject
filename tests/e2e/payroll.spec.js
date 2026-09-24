@@ -249,8 +249,10 @@ test('worker sees only their own approved earnings for the selected range', asyn
   await expect(page.getByRole('button', { name: 'View Payroll' })).toHaveCount(0);
   await page.getByLabel('Start Date').fill('2026-08-26');
   await page.getByLabel('End Date').fill('2026-09-27');
-  await expect(page.getByLabel('Worker')).toHaveCount(0);
-  await expect(page.getByText('PO-1001', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Worker', { exact: true })).toHaveCount(0);
+  await expect(
+    page.locator('p:visible, td:visible').filter({ hasText: /^PO-1001$/ })
+  ).toBeVisible();
   await expect(page.getByText('PO-1002', { exact: true })).toHaveCount(0);
   const payrollCall = calls.find((call) => call.method === 'GET' && call.path === '/payroll/range');
   expect(payrollCall).toBeTruthy();

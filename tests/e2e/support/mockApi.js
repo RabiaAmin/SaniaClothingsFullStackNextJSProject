@@ -711,8 +711,8 @@ async function mockApi(page, options = {}) {
       const payrollWorkers = [
         {
           worker,
-          totalApprovedPieces: 40,
-          totalEarnings: 600,
+          totalApprovedPieces: options.payrollEntryQuantity ?? 40,
+          totalEarnings: options.payrollEntryAmount ?? 600,
           entryCount: 1,
           entries: [
             {
@@ -722,9 +722,9 @@ async function mockApi(page, options = {}) {
               poNumber: 'PO-1001',
               product: { _id: 'prod-1', name: 'Denim Work Jacket' },
               productionDescription: 'Navy work jackets',
-              quantity: 40,
-              unitRate: 15,
-              amount: 600,
+              quantity: options.payrollEntryQuantity ?? 40,
+              unitRate: options.payrollEntryRate ?? 15,
+              amount: options.payrollEntryAmount ?? 600,
             },
           ],
         },

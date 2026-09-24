@@ -26,7 +26,7 @@ test('worker submits production for themselves with a server-owned rate snapshot
   await expect(page.getByRole('heading', { name: 'Production Entries' })).toBeVisible();
   await page.getByRole('button', { name: 'Record Production' }).click();
   await page.getByRole('combobox').nth(0).click();
-  await page.getByRole('option', { name: 'PO-2026-001 - JK001' }).click();
+  await page.getByRole('option', { name: /^PO-2026-001\b/ }).click();
   await expect(page.getByText(/12\.50 per piece/)).toBeVisible();
   await page.getByLabel('Production date *').fill('2026-08-23');
   await page.getByLabel('Pieces produced *').fill('20');
@@ -60,9 +60,9 @@ test('record production handles an older order without an item code', async ({ p
 
   await page.getByRole('button', { name: 'Record Production' }).click();
   await page.getByRole('combobox').nth(0).click();
-  await expect(
-    page.getByRole('option', { name: 'PO-LEGACY-001 - Item code unavailable' })
-  ).toBeVisible();
+  await expect(page.getByRole('option', { name: /^PO-LEGACY-001\b/ })).toContainText(
+    'Item code: Unavailable'
+  );
 });
 
 test('record production hides an order assigned to another worker', async ({ page }) => {
@@ -72,7 +72,7 @@ test('record production hides an order assigned to another worker', async ({ pag
 
   await page.getByRole('button', { name: 'Record Production' }).click();
   await page.getByRole('combobox').nth(0).click();
-  await expect(page.getByRole('option', { name: 'PO-2026-001 - JK001' })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: /^PO-2026-001\b/ })).toHaveCount(0);
 });
 
 test('worker sees only their own pending entry and cannot approve it', async ({ page }) => {

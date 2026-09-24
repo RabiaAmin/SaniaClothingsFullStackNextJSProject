@@ -48,8 +48,11 @@ export function WorkerOrderCard({ order, onAddWork }) {
               <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               {order.poNumber}
             </p>
-            <p className="mt-1 truncate font-mono text-sm text-muted-foreground">
-              {order.itemCode || 'Item code unavailable'}
+            <p className="mt-1 line-clamp-2 text-sm font-medium">
+              {order.productionDescription || order.product?.name || 'Production item'}
+            </p>
+            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+              Item code: {order.itemCode || 'Unavailable'}
             </p>
           </div>
           <Badge variant={productionOrderStatusVariant(tracking.status)} className="shrink-0 gap-1">
@@ -129,9 +132,16 @@ export function WorkerEntryCard({ entry, onEdit, showItemCode = true }) {
           <div>
             <p className="font-mono font-bold">{entry.productionOrder?.poNumber ?? 'Unknown PO'}</p>
             {showItemCode && (
-              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                {entry.productionOrder?.itemCode || 'Item code unavailable'}
-              </p>
+              <>
+                <p className="mt-1 line-clamp-2 text-sm font-medium">
+                  {entry.productionOrder?.productionDescription ||
+                    entry.productionOrder?.product?.name ||
+                    'Production item'}
+                </p>
+                <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                  Item code: {entry.productionOrder?.itemCode || 'Unavailable'}
+                </p>
+              </>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
               {entry.worker?.username ?? entry.worker?.email ?? 'Worker'}

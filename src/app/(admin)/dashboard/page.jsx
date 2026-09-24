@@ -55,6 +55,7 @@ import {
   WorkerEntryCard,
   WorkerOrderCard,
 } from '@/components/worker/WorkerMobileCards';
+import WorkerInstallCard from '@/components/worker/WorkerInstallCard';
 
 function monthParams() {
   const now = new Date();
@@ -542,7 +543,8 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
   );
 
   return (
-    <div data-testid="worker-dashboard">
+    <div data-testid="worker-dashboard" className="space-y-5">
+      <WorkerInstallCard />
       {showWorkerMobile && (
         <section className="space-y-5">
           <div className="space-y-3">

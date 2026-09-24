@@ -1,22 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { ClipboardList, Home, PlusCircle, UserRound } from 'lucide-react';
+import { Banknote, ClipboardCheck, Home, PlusCircle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
   { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/production-orders', label: 'My Work', icon: ClipboardList },
   {
     href: '/production-entries?record=true',
-    path: '/production-entries',
     label: 'Add Work',
     icon: PlusCircle,
     permission: 'production_entry.create',
+    isAction: true,
   },
-  { href: '/password', label: 'Profile', icon: UserRound },
+  { href: '/production-entries', label: 'My Work', icon: ClipboardCheck },
+  { href: '/payroll', label: 'Earnings', icon: Banknote, permission: 'payroll.read_own' },
 ];
 
 export default function WorkerMobileNavigation() {
@@ -36,9 +36,10 @@ export default function WorkerMobileNavigation() {
       >
         <div className="mx-auto flex max-w-lg">
           {ITEMS.filter(({ permission }) => !permission || hasPermission(permission)).map(
-            ({ href, path = href, label, icon: Icon }) => {
+            ({ href, path = href, label, icon: Icon, isAction }) => {
               const active =
-                pathname === path || (path !== '/dashboard' && pathname.startsWith(`${path}/`));
+                !isAction &&
+                (pathname === path || (path !== '/dashboard' && pathname.startsWith(`${path}/`)));
               return (
                 <Link
                   key={label}

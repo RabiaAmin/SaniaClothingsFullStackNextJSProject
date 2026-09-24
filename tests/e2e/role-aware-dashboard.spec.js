@@ -87,6 +87,7 @@ test('Production Manager sees due-soon and overdue production alerts without not
 
 test('Worker sees only personal production, earnings, orders, and notifications', async ({
   page,
+  isMobile,
 }) => {
   const calls = await mockApi(page, { user: worker });
   await page.goto('/dashboard');
@@ -97,7 +98,9 @@ test('Worker sees only personal production, earnings, orders, and notifications'
   await expect(page.getByText('Approved earnings')).toBeVisible();
   await expect(page.getByText('Available production orders')).toBeVisible();
   await expect(page.getByText('My Assigned Orders')).toBeVisible();
-  await expect(page.getByText('JK001', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(isMobile ? 'Item code: JK001' : 'JK001', { exact: true })
+  ).toBeVisible();
   await expect(page.getByText(/40 remaining/)).toBeVisible();
   await expect(page.getByText(/Deadline Aug 30, 2026/)).toBeVisible();
   await expect(page.getByText('In Progress', { exact: true })).toBeVisible();

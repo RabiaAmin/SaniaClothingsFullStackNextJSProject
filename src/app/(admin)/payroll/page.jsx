@@ -263,7 +263,7 @@ function PayrollPageContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Approved Entry Audit</CardTitle>
+          <CardTitle>{canReadAll ? 'Approved Entry Audit' : 'My approved work'}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {activeQuery.isLoading ? (
@@ -280,43 +280,97 @@ function PayrollPageContent() {
               className="m-6"
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  {canReadAll && <TableHead>Worker</TableHead>}
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Product / Description</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {auditEntries.map((entry) => (
-                  <TableRow key={entry.productionEntryId}>
-                    <TableCell>{formatDate(entry.date)}</TableCell>
-                    {canReadAll && (
-                      <TableCell>{entry.worker.username ?? entry.worker.email}</TableCell>
-                    )}
-                    <TableCell className="font-mono font-semibold">{entry.poNumber}</TableCell>
-                    <TableCell>
-                      <p className="font-medium">{entry.product?.name ?? 'Custom production'}</p>
-                      <p className="max-w-64 truncate text-xs text-muted-foreground">
-                        {entry.productionDescription}
-                      </p>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{entry.quantity}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(entry.unitRate)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {formatCurrency(entry.amount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              {!canReadAll && (
+                <div className="space-y-3 p-4 md:hidden">
+                  {auditEntries.map((entry) => (
+                    <article
+                      key={entry.productionEntryId}
+                      className="space-y-3 rounded-lg border p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono font-bold">{entry.poNumber}</p>
+                          <p className="mt-1 line-clamp-2 text-sm font-medium">
+                            {entry.product?.name ??
+                              entry.productionDescription ??
+                              'Production item'}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-xs text-muted-foreground">
+                          {formatDate(entry.date)}
+                        </p>
+                      </div>
+                      <dl
+                        data-testid="worker-earnings-metrics"
+                        className="grid min-w-0 grid-cols-2 gap-2 text-center"
+                      >
+                        <div className="min-w-0 rounded-md bg-muted/60 p-2">
+                          <dt className="text-xs text-muted-foreground">Pieces</dt>
+                          <dd className="font-semibold tabular-nums">{entry.quantity}</dd>
+                        </div>
+                        <div className="min-w-0 rounded-md bg-muted/60 p-2">
+                          <dt className="text-xs text-muted-foreground">Rate</dt>
+                          <dd className="break-words font-semibold tabular-nums [overflow-wrap:anywhere]">
+                            {formatCurrency(entry.unitRate)}
+                          </dd>
+                        </div>
+                        <div className="col-span-2 min-w-0 rounded-md bg-primary/10 p-2">
+                          <dt className="text-xs text-muted-foreground">Earned</dt>
+                          <dd
+                            data-testid="worker-earned-value"
+                            className="break-words font-bold tabular-nums text-primary [overflow-wrap:anywhere]"
+                          >
+                            {formatCurrency(entry.amount)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+              )}
+              <div className={!canReadAll ? 'hidden md:block' : ''}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      {canReadAll && <TableHead>Worker</TableHead>}
+                      <TableHead>PO Number</TableHead>
+                      <TableHead>Product / Description</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditEntries.map((entry) => (
+                      <TableRow key={entry.productionEntryId}>
+                        <TableCell>{formatDate(entry.date)}</TableCell>
+                        {canReadAll && (
+                          <TableCell>{entry.worker.username ?? entry.worker.email}</TableCell>
+                        )}
+                        <TableCell className="font-mono font-semibold">{entry.poNumber}</TableCell>
+                        <TableCell>
+                          <p className="font-medium">
+                            {entry.product?.name ?? 'Custom production'}
+                          </p>
+                          <p className="max-w-64 truncate text-xs text-muted-foreground">
+                            {entry.productionDescription}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{entry.quantity}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(entry.unitRate)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {formatCurrency(entry.amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

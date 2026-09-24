@@ -22,8 +22,10 @@ import { Menu, Scissors, Zap, Settings, LogOut, User, X } from 'lucide-react';
 export default function Navbar({ variant = 'admin', onMenuClick }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isWorker =
+    hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
 
   async function handleLogout() {
     await logout().catch(() => {});
@@ -124,7 +126,10 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
       {/* Hamburger — mobile only */}
       <button
         onClick={onMenuClick}
-        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+        className={cn(
+          'rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden',
+          isWorker && 'hidden'
+        )}
         aria-label="Toggle sidebar"
       >
         <Menu className="h-5 w-5" />
@@ -136,7 +141,7 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
         className="flex items-center gap-2 font-bold text-foreground md:hidden"
       >
         <Zap className="h-4 w-4 text-primary" />
-        Invoicer
+        {isWorker ? 'Sania Clothing' : 'Invoicer'}
       </Link>
 
       <div className="flex-1" />
@@ -146,7 +151,10 @@ export default function Navbar({ variant = 'admin', onMenuClick }) {
       {/* User avatar + dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-lg p-1 hover:bg-accent outline-none">
+          <button
+            className="flex items-center gap-2 rounded-lg p-1 hover:bg-accent outline-none"
+            aria-label="Open account menu"
+          >
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>

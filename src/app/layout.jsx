@@ -3,15 +3,16 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import QueryProvider from '@/components/common/QueryProvider';
+import PwaRegistrar from '@/components/common/PwaRegistrar';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata = {
   title: {
-    default: 'Invoicer',
-    template: '%s | Invoicer',
+    default: 'Sania Clothing',
+    template: '%s | Sania Clothing',
   },
-  description: 'Professional invoicing and business management platform',
+  description: 'Sania Clothing production and business operations',
   manifest: '/site.webmanifest',
   icons: {
     icon: [
@@ -33,9 +34,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </QueryProvider>
+        <PwaRegistrar>
+          <QueryProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </QueryProvider>
+        </PwaRegistrar>
         <Toaster />
       </body>
     </html>
