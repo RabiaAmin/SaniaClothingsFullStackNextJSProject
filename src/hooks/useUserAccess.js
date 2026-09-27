@@ -35,3 +35,14 @@ export function useUpdateUserAccess() {
     },
   });
 }
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => userAccessApi.deleteUser(id).then((response) => response.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USER_ACCESS_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: ROLE_KEYS.all });
+    },
+  });
+}

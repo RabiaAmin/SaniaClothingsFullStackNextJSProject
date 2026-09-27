@@ -15,10 +15,15 @@ import {
 
 export default function WorkerInstallCard() {
   const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const { canInstall, install, isInstalled, isIOSSafari, isPrompting, shouldShowManualInstall } =
-    usePwaInstall();
+  const { canInstall, install, isInstalled, isIOSSafari, isPrompting, isIOS } = usePwaInstall();
 
-  if (isInstalled || (!canInstall && !shouldShowManualInstall)) return null;
+  const helpText = canInstall
+    ? 'Install this app on your phone for easier access.'
+    : isIOS
+      ? 'Use Safari to add Sania Clothing to your Home Screen.'
+      : isInstalled
+        ? 'Sania Clothing is already installed. If you removed it, open this page again in your browser and use Install or Add to Home Screen.'
+        : "To install Sania Clothing, use your browser's Install or Add to Home Screen option.";
 
   return (
     <>
@@ -33,23 +38,23 @@ export default function WorkerInstallCard() {
             </span>
             <div>
               <h2 className="font-semibold">Install Sania Clothing</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Install this app on your phone for easier access.
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{helpText}</p>
             </div>
           </div>
-          <Button
-            type="button"
-            className="h-12 w-full shrink-0 text-base sm:w-auto"
-            disabled={isPrompting}
-            onClick={() => {
-              if (canInstall) install();
-              else setInstructionsOpen(true);
-            }}
-          >
-            <Download className="h-5 w-5" aria-hidden="true" />
-            {isPrompting ? 'Opening...' : 'Install App'}
-          </Button>
+          {(canInstall || isIOS) && (
+            <Button
+              type="button"
+              className="h-12 w-full shrink-0 text-base sm:w-auto"
+              disabled={isPrompting}
+              onClick={() => {
+                if (canInstall) install();
+                else setInstructionsOpen(true);
+              }}
+            >
+              <Download className="h-5 w-5" aria-hidden="true" />
+              {isPrompting ? 'Opening...' : canInstall ? 'Install App' : 'Show Steps'}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -59,7 +64,7 @@ export default function WorkerInstallCard() {
             <DialogTitle>Install Sania Clothing</DialogTitle>
             <DialogDescription>
               {isIOSSafari
-                ? 'Add the app to your Home Screen in two quick steps.'
+                ? 'Add the app to your Home Screen in three quick steps.'
                 : 'Open this page in Safari first, then follow these steps.'}
             </DialogDescription>
           </DialogHeader>
@@ -77,6 +82,12 @@ export default function WorkerInstallCard() {
                 2
               </span>
               <span>Choose Add to Home Screen.</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+                3
+              </span>
+              <span>Tap Add.</span>
             </li>
           </ol>
           <Button

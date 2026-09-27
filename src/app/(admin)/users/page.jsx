@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Copy, KeyRound, Loader2, Pencil, Plus, Users } from 'lucide-react';
+import { Check, Copy, KeyRound, Loader2, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useRoles } from '@/hooks/useRoles';
-import { useCreateUser, useUpdateUserAccess, useUsers } from '@/hooks/useUserAccess';
+import { useCreateUser, useDeleteUser, useUpdateUserAccess, useUsers } from '@/hooks/useUserAccess';
 import { toast } from '@/hooks/useToast';
 import PermissionGuard from '@/components/auth/PermissionGuard';
 import PageHeader from '@/components/admin/PageHeader';
 import EmptyState from '@/components/admin/EmptyState';
 import TableSkeleton from '@/components/admin/TableSkeleton';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -132,7 +133,8 @@ function CreateUserDialog({ open, onClose, roles, onCreated }) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              A secure temporary password will be generated automatically.
+              Workers receive a simple login password. Other users receive a secure temporary
+              password.
             </p>
           </div>
           <DialogFooter>
@@ -292,13 +294,25 @@ function AccessDialog({ open, onClose, user, roles }) {
 export default function UsersPage() {
   const { data: userData, isLoading: usersLoading, error } = useUsers();
   const { data: roleData, isLoading: rolesLoading } = useRoles();
+  const deleteUser = useDeleteUser();
   const [editTarget, setEditTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [credentials, setCredentials] = useState(null);
 
   const users = userData?.users ?? [];
   const roles = roleData?.roles ?? [];
   const isLoading = usersLoading || rolesLoading;
+
+  async function handleDelete() {
+    try {
+      await deleteUser.mutateAsync(deleteTarget._id);
+      toast({ title: 'User deleted' });
+      setDeleteTarget(null);
+    } catch (deleteError) {
+      toast({ title: deleteError.message ?? 'Could not delete user', variant: 'destructive' });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -364,9 +378,21 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <PermissionGuard permission="user.update">
-                        <Button variant="ghost" size="sm" onClick={() => setEditTarget(user)}>
-                          <Pencil className="h-4 w-4" /> Manage
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => setEditTarget(user)}>
+                            <Pencil className="h-4 w-4" /> Manage
+                          </Button>
+                          {user.role?.slug !== 'admin' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(user)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </Button>
+                          )}
+                        </div>
                       </PermissionGuard>
                     </TableCell>
                   </TableRow>
@@ -390,6 +416,15 @@ export default function UsersPage() {
         onCreated={setCredentials}
       />
       <CredentialsDialog credentials={credentials} onClose={() => setCredentials(null)} />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        loading={deleteUser.isPending}
+        title={`Delete ${deleteTarget?.role?.name ?? 'User'}?`}
+        description="This will remove this user's account. Historical production and payroll records will be preserved."
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

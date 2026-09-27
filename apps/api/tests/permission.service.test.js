@@ -70,6 +70,38 @@ test('authorization middleware returns 403 when a user lacks permission', () => 
   assert.equal(responseBody.success, false);
 });
 
+test('user deletion permission rejects a Worker direct API request', () => {
+  const req = {
+    user: {
+      role: {
+        permissions: [
+          { key: 'production_order.read' },
+          { key: 'production_entry.create' },
+          { key: 'production_entry.read_own' },
+        ],
+      },
+    },
+  };
+  let responseStatus;
+  const res = {
+    status(status) {
+      responseStatus = status;
+      return this;
+    },
+    json() {
+      return this;
+    },
+  };
+  let continued = false;
+
+  authorize('user.update')(req, res, () => {
+    continued = true;
+  });
+
+  assert.equal(continued, false);
+  assert.equal(responseStatus, 403);
+});
+
 test('authorization middleware accepts invoice manager wildcard access', () => {
   const middleware = authorize('invoice.update');
   const req = { user: { role: { permissions: [{ key: 'invoice.*' }] } } };

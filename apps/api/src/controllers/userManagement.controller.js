@@ -1,7 +1,10 @@
 const User = require('../models/user.model');
 const Role = require('../models/role.model');
 const asyncHandler = require('../utils/asyncHandler');
-const { generateTemporaryPassword } = require('../services/password.service');
+const {
+  generateTemporaryPassword,
+  generateWorkerPassword,
+} = require('../services/password.service');
 const { canGrantPermissions } = require('../services/permission.service');
 
 function serializeManagedUser(user) {
@@ -25,7 +28,7 @@ function canManageRole(user, role) {
 }
 
 exports.getUsers = asyncHandler(async (req, res) => {
-  const users = await User.find()
+  const users = await User.find({ deletedAt: null })
     .select('-resetPasswordToken -resetPasswordExpire')
     .populate({ path: 'role', populate: { path: 'permissions' } })
     .sort({ username: 1 });
@@ -53,18 +56,20 @@ exports.createUser = asyncHandler(async (req, res) => {
     });
   }
 
-  const temporaryPassword = generateTemporaryPassword();
-  const user = await User.create({
+  const user = new User({
     username,
     email,
     phone,
     aboutMe: aboutMe?.trim() || 'Internal user account',
     avatar: { public_id: '', url: '' },
-    password: temporaryPassword,
     role: role._id,
     isActive: true,
-    mustChangePassword: true,
+    mustChangePassword: role.slug !== 'worker',
   });
+  const temporaryPassword =
+    role.slug === 'worker' ? generateWorkerPassword(user.username) : generateTemporaryPassword();
+  user.password = temporaryPassword;
+  await user.save();
   await user.populate({ path: 'role', populate: { path: 'permissions' } });
 
   res.status(201).json({
@@ -76,7 +81,7 @@ exports.createUser = asyncHandler(async (req, res) => {
 });
 
 exports.updateUserAccess = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findOne({ _id: req.params.id, deletedAt: null });
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
   const currentRole = user.role ? await Role.findById(user.role).populate('permissions') : null;
@@ -123,4 +128,33 @@ exports.updateUserAccess = asyncHandler(async (req, res) => {
   await user.populate({ path: 'role', populate: { path: 'permissions' } });
 
   res.status(200).json({ success: true, message: 'User access updated successfully', user });
+});
+
+exports.deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  if (String(user._id) === String(req.user._id)) {
+    return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+  }
+
+  const role = user.role ? await Role.findById(user.role).populate('permissions') : null;
+  if (!canManageRole(req.user, role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You cannot delete a user whose role exceeds your own access',
+    });
+  }
+  if (role?.slug === 'admin') {
+    return res.status(400).json({ success: false, message: 'Admin accounts cannot be deleted' });
+  }
+
+  user.isActive = false;
+  user.mustChangePassword = false;
+  user.deletedAt = new Date();
+  user.deletedBy = req.user._id;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({ success: true, message: 'User deleted successfully' });
 });

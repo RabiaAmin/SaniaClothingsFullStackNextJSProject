@@ -108,7 +108,7 @@ exports.login = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email & Password Are Required!' });
   }
 
-  const user = await populateAccess(User.findOne({ email }).select('+password'));
+  const user = await populateAccess(User.findOne({ email, deletedAt: null }).select('+password'));
 
   // TODO: remove after diagnosing login failure — do NOT leave in production
   if (!user) {
@@ -218,7 +218,7 @@ exports.updatePassword = asyncHandler(async (req, res) => {
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email, deletedAt: null, isActive: { $ne: false } });
 
   if (!user) {
     return res.status(404).json({ success: false, message: 'User Not Found' });

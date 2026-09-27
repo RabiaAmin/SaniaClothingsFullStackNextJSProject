@@ -66,7 +66,9 @@ test('admin can assign or remove a user role from database roles', async ({ page
     .toEqual(expect.objectContaining({ payload: { roleId: null, isActive: true } }));
 });
 
-test('temporary-password user creation forces a one-time password change', async ({ page }) => {
+test('Worker creation uses a simple password and opens the dashboard without forced change', async ({
+  page,
+}) => {
   const calls = await mockApi(page);
   await page.goto('/users');
 
@@ -80,24 +82,17 @@ test('temporary-password user creation forces a one-time password change', async
   await createDialog.getByRole('button', { name: 'Create User' }).click();
 
   const credentialsDialog = page.getByRole('dialog');
-  await expect(credentialsDialog.getByText('TempWorkerA1!secure', { exact: true })).toBeVisible();
+  await expect(credentialsDialog.getByText('production-worker123#', { exact: true })).toBeVisible();
   await expect(credentialsDialog.getByText(/will not be shown again/i)).toBeVisible();
   await credentialsDialog.getByRole('button', { name: 'Done' }).click();
-  await expect(page.getByText('TempWorkerA1!secure', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('production-worker123#', { exact: true })).toHaveCount(0);
 
   await page.goto('/login');
   await page.getByLabel('Email address').fill('worker@sania.test');
-  await page.getByLabel('Password', { exact: true }).fill('TempWorkerA1!secure');
+  await page.getByLabel('Password', { exact: true }).fill('production-worker123#');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL(/\/change-password$/);
-  await expect(page.getByRole('heading', { name: 'Choose your password' })).toBeVisible();
-
-  await page.getByLabel('Current or temporary password').fill('TempWorkerA1!secure');
-  await page.getByLabel('New password', { exact: true }).fill('PermanentWorker123');
-  await page.getByLabel('Confirm new password').fill('PermanentWorker123');
-  await page.getByRole('button', { name: 'Change Password' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByTestId('worker-dashboard')).toBeVisible();
   await expect(page.getByRole('link', { name: 'User Access' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Invoice Manager' })).toHaveCount(0);
 
@@ -109,12 +104,37 @@ test('temporary-password user creation forces a one-time password change', async
   expect(calls.filter((call) => call.method === 'GET' && call.path === '/users')).toHaveLength(
     userCallsBeforeDeniedPage
   );
+});
 
-  await page.goto('/login');
-  await page.getByLabel('Email address').fill('worker@sania.test');
-  await page.getByLabel('Password', { exact: true }).fill('TempWorkerA1!secure');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByText('Invalid Email Or Password!')).toBeVisible();
+test('admin deletion requires confirmation and removes the user from the list', async ({
+  page,
+}) => {
+  const calls = await mockApi(page);
+  await page.goto('/users');
+
+  await page.getByRole('button', { name: 'Create User' }).click();
+  const createDialog = page.getByRole('dialog');
+  await createDialog.getByLabel('Username').fill('delete-worker');
+  await createDialog.getByLabel('Email').fill('delete@sania.test');
+  await createDialog.getByLabel('Phone').fill('+27 82 555 0555');
+  await createDialog.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Worker', exact: true }).click();
+  await createDialog.getByRole('button', { name: 'Create User' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Done' }).click();
+
+  const row = page.getByRole('row').filter({ hasText: 'delete-worker' });
+  await row.getByRole('button', { name: 'Delete' }).click();
+  const confirmDialog = page.getByRole('dialog');
+  await expect(confirmDialog.getByText(/Historical production and payroll records/)).toBeVisible();
+  await expect(
+    calls.filter((call) => call.method === 'DELETE' && call.path.startsWith('/users/'))
+  ).toHaveLength(0);
+  await confirmDialog.getByRole('button', { name: 'Delete', exact: true }).click();
+
+  await expect(row).toHaveCount(0);
+  await expect
+    .poll(() => calls.find((call) => call.method === 'DELETE'))
+    .toEqual(expect.objectContaining({ path: '/users/user-created-worker' }));
 });
 
 test('read-only custom permissions hide mutations and block direct edit URLs', async ({ page }) => {

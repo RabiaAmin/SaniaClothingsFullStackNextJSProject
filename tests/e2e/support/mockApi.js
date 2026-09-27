@@ -454,7 +454,10 @@ async function mockApi(page, options = {}) {
     if (method === 'POST' && path === '/users') {
       const payload = await readPayload(route);
       const role = roles.find((item) => item._id === payload.roleId);
-      createdUserPassword = 'TempWorkerA1!secure';
+      createdUserPassword =
+        role.slug === 'worker'
+          ? `${payload.username.toLowerCase().trim().replace(/\s/g, '')}123#`
+          : 'TempUserA1!secure';
       createdUser = {
         _id: 'user-created-worker',
         username: payload.username,
@@ -462,9 +465,15 @@ async function mockApi(page, options = {}) {
         phone: payload.phone,
         aboutMe: payload.aboutMe || 'Internal user account',
         isActive: true,
-        mustChangePassword: true,
+        mustChangePassword: role.slug !== 'worker',
         role: { _id: role._id, name: role.name, slug: role.slug },
-        permissions: ['production_order.read', 'production_entry.read_own', 'payroll.read_own'],
+        permissions: [
+          'production_order.read',
+          'production_entry.create',
+          'production_entry.read_own',
+          'production_entry.update_own',
+          'payroll.read_own',
+        ],
       };
       managedUsers.push(createdUser);
       return response(
@@ -475,6 +484,12 @@ async function mockApi(page, options = {}) {
     }
     if (method === 'PUT' && path.startsWith('/users/')) {
       return response(route, { success: true, user: currentUser });
+    }
+    if (method === 'DELETE' && path.startsWith('/users/')) {
+      const userId = path.split('/')[2];
+      const userIndex = managedUsers.findIndex((managedUser) => managedUser._id === userId);
+      if (userIndex !== -1) managedUsers.splice(userIndex, 1);
+      return response(route, { success: true, message: 'User deleted successfully' });
     }
 
     if (method === 'GET' && path === '/notifications/unread-count') {

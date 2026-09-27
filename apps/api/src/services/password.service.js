@@ -6,6 +6,10 @@ function generateTemporaryPassword() {
   return `${crypto.randomBytes(12).toString('base64url')}A1!`;
 }
 
+function generateWorkerPassword(username) {
+  return `${username.replace(/\s/g, '')}123#`;
+}
+
 function validatePermanentPassword(password) {
   if (typeof password !== 'string' || password.length < MINIMUM_PASSWORD_LENGTH) {
     return `Password must be at least ${MINIMUM_PASSWORD_LENGTH} characters long`;
@@ -18,5 +22,6 @@ function validatePermanentPassword(password) {
 module.exports = {
   MINIMUM_PASSWORD_LENGTH,
   generateTemporaryPassword,
+  generateWorkerPassword,
   validatePermanentPassword,
 };

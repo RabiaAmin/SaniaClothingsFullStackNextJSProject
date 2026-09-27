@@ -53,10 +53,14 @@ test('Worker can accept the captured Chromium installation prompt', async ({ pag
   await card.getByRole('button', { name: 'Install App' }).click();
 
   await expect.poll(() => page.evaluate(() => window.__installPromptCalls ?? 0)).toBe(1);
-  await expect(card).toHaveCount(0);
+  await expect(card).toBeVisible();
+  await expect(card.getByText(/is already installed/i)).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Install App' })).toHaveCount(0);
 });
 
-test('a dismissed Chromium prompt stays hidden for the session', async ({ page }) => {
+test('a dismissed Chromium prompt leaves installation help visible without a dead button', async ({
+  page,
+}) => {
   await mockApi(page, { user: workerUser });
   await page.goto('/dashboard');
   await expect(page.getByTestId('worker-dashboard')).toBeVisible();
@@ -65,13 +69,14 @@ test('a dismissed Chromium prompt stays hidden for the session', async ({ page }
   const card = page.getByTestId('worker-install-card');
   await expect(card).toBeVisible();
   await card.getByRole('button', { name: 'Install App' }).click();
-  await expect(card).toHaveCount(0);
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Install App' })).toHaveCount(0);
 
   await dispatchInstallPrompt(page, 'accepted');
-  await expect(card).toHaveCount(0);
+  await expect(card).toBeVisible();
 });
 
-test('appinstalled hides a visible Worker installation card', async ({ page }) => {
+test('appinstalled keeps Worker installation help accessible', async ({ page }) => {
   await mockApi(page, { user: workerUser });
   await page.goto('/dashboard');
   await expect(page.getByTestId('worker-dashboard')).toBeVisible();
@@ -80,10 +85,13 @@ test('appinstalled hides a visible Worker installation card', async ({ page }) =
   const card = page.getByTestId('worker-install-card');
   await expect(card).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')));
-  await expect(card).toHaveCount(0);
+  await expect(card).toBeVisible();
+  await expect(card.getByText(/is already installed/i)).toBeVisible();
 });
 
-test('standalone Workers and non-Workers do not see installation UI', async ({ page }) => {
+test('standalone Workers retain installation help while non-Workers do not see it', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true });
   });
@@ -91,7 +99,7 @@ test('standalone Workers and non-Workers do not see installation UI', async ({ p
   await page.goto('/dashboard');
   await expect(page.getByTestId('worker-dashboard')).toBeVisible();
   await dispatchInstallPrompt(page);
-  await expect(page.getByTestId('worker-install-card')).toHaveCount(0);
+  await expect(page.getByTestId('worker-install-card')).toBeVisible();
 
   await mockApi(page);
   await page.goto('/dashboard');
@@ -117,9 +125,10 @@ test('iPhone Workers receive short Safari Home Screen instructions', async ({ pa
 
   const card = page.getByTestId('worker-install-card');
   await expect(card).toBeVisible();
-  await card.getByRole('button', { name: 'Install App' }).click();
+  await card.getByRole('button', { name: 'Show Steps' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Install Sania Clothing' })).toBeVisible();
   await expect(dialog.getByText('Tap the Share button')).toBeVisible();
   await expect(dialog.getByText('Choose Add to Home Screen.')).toBeVisible();
+  await expect(dialog.getByText('Tap Add.')).toBeVisible();
 });

@@ -21,7 +21,7 @@ async function resolvePermissions(permissionIds) {
 exports.getRoles = asyncHandler(async (req, res) => {
   const roles = await Role.find().populate('permissions').sort({ isSystem: -1, name: 1 });
   const assignmentCounts = await User.aggregate([
-    { $match: { role: { $ne: null } } },
+    { $match: { role: { $ne: null }, deletedAt: null } },
     { $group: { _id: '$role', count: { $sum: 1 } } },
   ]);
   const countByRole = new Map(assignmentCounts.map(({ _id, count }) => [String(_id), count]));
@@ -42,7 +42,7 @@ exports.getRoleUsers = asyncHandler(async (req, res) => {
   const role = await Role.findById(req.params.id).select('name slug');
   if (!role) return res.status(404).json({ success: false, message: 'Role not found' });
 
-  const users = await User.find({ role: role._id })
+  const users = await User.find({ role: role._id, deletedAt: null })
     .select('username email isActive createdAt')
     .sort({ username: 1 });
   res.status(200).json({ success: true, role, users });
@@ -108,7 +108,7 @@ exports.updateRole = asyncHandler(async (req, res) => {
       });
     }
     if (req.body.isActive === false && role.isActive !== false) {
-      const assignedUsers = await User.countDocuments({ role: role._id });
+      const assignedUsers = await User.countDocuments({ role: role._id, deletedAt: null });
       if (assignedUsers > 0) {
         return res.status(409).json({
           success: false,
@@ -153,7 +153,7 @@ exports.deleteRole = asyncHandler(async (req, res) => {
     });
   }
 
-  const assignedUsers = await User.countDocuments({ role: role._id });
+  const assignedUsers = await User.countDocuments({ role: role._id, deletedAt: null });
   if (assignedUsers > 0) {
     return res.status(409).json({
       success: false,

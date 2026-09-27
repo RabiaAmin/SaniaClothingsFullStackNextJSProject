@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const User = require('../src/models/user.model');
 const {
   generateTemporaryPassword,
+  generateWorkerPassword,
   validatePermanentPassword,
 } = require('../src/services/password.service');
 
@@ -14,6 +15,28 @@ test('temporary passwords are unique and satisfy permanent password rules', () =
     assert.equal(validatePermanentPassword(password), null);
     assert.ok(password.length >= 8);
   }
+});
+
+test('worker passwords remove username whitespace before adding the simple suffix', () => {
+  assert.equal(generateWorkerPassword('asif'), 'asif123#');
+  assert.equal(generateWorkerPassword('asif 222'), 'asif222123#');
+  assert.equal(generateWorkerPassword('shahzad ali'), 'shahzadali123#');
+  assert.equal(generateWorkerPassword('john   smith'), 'johnsmith123#');
+});
+
+test('worker password generation leaves the User document username unchanged for persistence', async () => {
+  const user = new User({
+    username: 'shahzad ali',
+    email: 'shahzad@example.com',
+    phone: '+27 82 555 0102',
+    password: generateWorkerPassword('shahzad ali'),
+    aboutMe: 'Internal user account',
+  });
+
+  assert.equal(generateWorkerPassword(user.username), 'shahzadali123#');
+  await user.validate();
+  assert.equal(user.username, 'shahzad ali');
+  assert.equal(user.toObject().username, 'shahzad ali');
 });
 
 test('permanent password validation follows existing UI requirements', () => {

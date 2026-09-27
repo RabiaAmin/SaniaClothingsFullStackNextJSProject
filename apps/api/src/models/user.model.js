@@ -57,6 +57,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
+    default: null,
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
 });
