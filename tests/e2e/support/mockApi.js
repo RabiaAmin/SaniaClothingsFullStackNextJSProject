@@ -554,6 +554,7 @@ async function mockApi(page, options = {}) {
                 _id: 'production-order-legacy',
                 poNumber: 'PO-LEGACY-001',
                 itemCode: undefined,
+                assignedWorkers,
               },
             ]
           : []),

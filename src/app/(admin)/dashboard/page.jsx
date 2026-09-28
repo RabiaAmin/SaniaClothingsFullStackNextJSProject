@@ -531,7 +531,6 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
   const assignedOrders = orders.filter((order) =>
     (order.assignedWorkers ?? []).some((worker) => String(worker?._id ?? worker) === String(userId))
   );
-  const availableOrders = orders.filter((order) => (order.assignedWorkers ?? []).length === 0);
   const notifications = notificationsQuery.data?.notifications ?? [];
   const estimated = entries
     .filter((entry) => entry.status === 'PENDING')
@@ -651,26 +650,6 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
               </p>
             ) : (
               assignedOrders
-                .slice(0, 2)
-                .map((order) => (
-                  <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
-                ))
-            )}
-          </section>
-
-          <section className="space-y-3" aria-labelledby="mobile-available-orders-heading">
-            <h2 id="mobile-available-orders-heading" className="font-semibold">
-              Available Orders
-            </h2>
-            <p className="text-sm text-muted-foreground">Available production orders</p>
-            {ordersQuery.isLoading ? (
-              <WorkerCardSkeleton count={1} />
-            ) : availableOrders.length === 0 ? (
-              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                No unassigned production orders are available.
-              </p>
-            ) : (
-              availableOrders
                 .slice(0, 2)
                 .map((order) => (
                   <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
@@ -842,18 +821,12 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
               )}
             </CardContent>
           </Card>
-          <div className="grid gap-6 xl:grid-cols-3">
+          <div className="grid gap-6 xl:grid-cols-2">
             <WorkerOrdersCard
               title="My Assigned Orders"
               orders={assignedOrders}
               isLoading={ordersQuery.isLoading}
               emptyMessage="No production orders are assigned to you."
-            />
-            <WorkerOrdersCard
-              title="Available production orders"
-              orders={availableOrders}
-              isLoading={ordersQuery.isLoading}
-              emptyMessage="No unassigned production orders are available."
             />
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">

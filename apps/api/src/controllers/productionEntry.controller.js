@@ -67,6 +67,7 @@ exports.createProductionEntry = asyncHandler(async (req, res) => {
     date: parsedDate,
     quantity: parsedQuantity,
     notes: typeof notes === 'string' ? notes.trim() : '',
+    allowUnassignedOrder: canReadAll(req.user),
   });
   await populateEntry(productionEntry);
 

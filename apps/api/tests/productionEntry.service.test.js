@@ -142,6 +142,7 @@ test('submission works without transactions and creates reviewer notifications',
     _id: orderId,
     poNumber: 'PO-1025',
     status: 'IN_PROGRESS',
+    assignedWorkers: [workerId],
     orderedQuantity: 120,
     workerRate: 15,
   });
@@ -238,6 +239,36 @@ test('every assigned worker can submit production while unassigned workers are r
   }
 });
 
+test('workers cannot submit production against an unassigned order', async () => {
+  const originalFindById = ProductionOrder.findById;
+  const workerId = new mongoose.Types.ObjectId();
+
+  ProductionOrder.findById = async () => ({
+    _id: new mongoose.Types.ObjectId(),
+    poNumber: 'PO-UNASSIGNED',
+    assignedWorkers: [],
+    status: 'PENDING',
+    orderedQuantity: 100,
+    workerRate: 10,
+  });
+
+  try {
+    await assert.rejects(
+      () =>
+        submitProductionEntry({
+          productionOrderId: new mongoose.Types.ObjectId(),
+          workerId,
+          workerName: 'Worker',
+          date: new Date(),
+          quantity: 10,
+        }),
+      (error) => error.statusCode === 403 && /not assigned/i.test(error.message)
+    );
+  } finally {
+    ProductionOrder.findById = originalFindById;
+  }
+});
+
 test('a notification failure does not report a persisted production claim as failed', async () => {
   const originals = {
     orderFindById: ProductionOrder.findById,
@@ -246,11 +277,13 @@ test('a notification failure does not report a persisted production claim as fai
     consoleError: console.error,
   };
   const entry = { _id: new mongoose.Types.ObjectId(), unitRate: 15, totalAmount: 150 };
+  const workerId = new mongoose.Types.ObjectId();
 
   ProductionOrder.findById = async () => ({
     _id: new mongoose.Types.ObjectId(),
     poNumber: 'PO-NOTIFY',
     status: 'IN_PROGRESS',
+    assignedWorkers: [workerId],
     orderedQuantity: 100,
     workerRate: 15,
   });
@@ -263,7 +296,7 @@ test('a notification failure does not report a persisted production claim as fai
   try {
     const result = await submitProductionEntry({
       productionOrderId: new mongoose.Types.ObjectId(),
-      workerId: new mongoose.Types.ObjectId(),
+      workerId,
       workerName: 'Worker',
       date: new Date(),
       quantity: 10,

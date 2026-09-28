@@ -15,7 +15,9 @@ const {
   enrichProductionOrders,
 } = require('../services/productionProgress.service');
 const {
+  getNewlyAssignedWorkerIds,
   getAssignableWorkers,
+  isWorkerAssigned,
   notifyAssignedWorkers,
   resolveAssignedWorkerIds,
 } = require('../services/productionAssignment.service');
@@ -68,6 +70,13 @@ async function validateReferences(clientId, productId) {
 
 function canManageAssignments(req) {
   return hasPermission(req.user, 'production_order.assign');
+}
+
+function isWorkerScopedRequest(req) {
+  return (
+    hasPermission(req.user, 'production_entry.read_own') &&
+    !hasPermission(req.user, 'production_entry.read_all')
+  );
 }
 
 async function resolveRequestedAssignments(req, assignedWorkerIds) {
@@ -207,20 +216,8 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
     }
     filter.client = req.query.clientId;
   }
-  if (
-    hasPermission(req.user, 'production_entry.read_own') &&
-    !hasPermission(req.user, 'production_entry.read_all')
-  ) {
-    filter.$and = [
-      ...(filter.$and ?? []),
-      {
-        $or: [
-          { assignedWorkers: req.user._id },
-          { assignedWorkers: { $exists: false } },
-          { assignedWorkers: { $size: 0 } },
-        ],
-      },
-    ];
+  if (isWorkerScopedRequest(req)) {
+    filter.$and = [...(filter.$and ?? []), { assignedWorkers: req.user._id }];
   }
 
   let [productionOrders, totalRecords] = await Promise.all([
@@ -258,6 +255,12 @@ exports.getProductionOrder = asyncHandler(async (req, res) => {
   const productionOrder = await ProductionOrder.findById(req.params.id).populate(POPULATE_FIELDS);
   if (!productionOrder) {
     return res.status(404).json({ success: false, message: 'Production order not found' });
+  }
+  if (isWorkerScopedRequest(req) && !isWorkerAssigned(productionOrder, req.user._id)) {
+    return res.status(403).json({
+      success: false,
+      message: 'You are not assigned to this production order',
+    });
   }
 
   const invoiceRelationship = hasPermission(req.user, 'invoice.read')
@@ -364,8 +367,10 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
   }
   productionOrder.updatedBy = req.user._id;
   await productionOrder.save({ validateModifiedOnly: true });
-  const newlyAssignedWorkerIds =
-    assignments?.filter((workerId) => !previousAssignedWorkerIds.includes(String(workerId))) ?? [];
+  const newlyAssignedWorkerIds = getNewlyAssignedWorkerIds(
+    previousAssignedWorkerIds,
+    assignments ?? previousAssignedWorkerIds
+  );
   await sendAssignmentNotifications({
     workerIds: newlyAssignedWorkerIds,
     order: productionOrder,

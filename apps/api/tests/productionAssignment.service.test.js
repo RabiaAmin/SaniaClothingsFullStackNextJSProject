@@ -4,7 +4,9 @@ const mongoose = require('mongoose');
 const User = require('../src/models/user.model');
 const notificationService = require('../src/services/notification.service');
 const {
+  getNewlyAssignedWorkerIds,
   isEligibleWorker,
+  isWorkerAssigned,
   notifyAssignedWorkers,
   resolveAssignedWorkerIds,
 } = require('../src/services/productionAssignment.service');
@@ -99,4 +101,46 @@ test('assignment notifications use the existing deduplicating notification servi
   } finally {
     notificationService.createNotificationsForUsers = originalCreateNotifications;
   }
+});
+
+test('an empty assignment creates no worker notifications', async () => {
+  const originalCreateNotifications = notificationService.createNotificationsForUsers;
+  let callCount = 0;
+  notificationService.createNotificationsForUsers = async () => {
+    callCount += 1;
+    return [];
+  };
+
+  try {
+    assert.deepEqual(
+      await notifyAssignedWorkers({
+        workerIds: [],
+        order: { _id: new mongoose.Types.ObjectId(), poNumber: 'PO-UNASSIGNED' },
+        actorId: new mongoose.Types.ObjectId(),
+      }),
+      []
+    );
+    assert.equal(callCount, 0);
+  } finally {
+    notificationService.createNotificationsForUsers = originalCreateNotifications;
+  }
+});
+
+test('assignment changes identify only newly assigned workers', () => {
+  const workerA = new mongoose.Types.ObjectId();
+  const workerB = new mongoose.Types.ObjectId();
+  const workerC = new mongoose.Types.ObjectId();
+
+  assert.deepEqual(getNewlyAssignedWorkerIds([workerA, workerB], [workerA, workerB]), []);
+  assert.deepEqual(getNewlyAssignedWorkerIds([workerA, workerB], [workerA, workerB, workerC]), [
+    String(workerC),
+  ]);
+});
+
+test('worker access requires an explicit production order assignment', () => {
+  const workerId = new mongoose.Types.ObjectId();
+
+  assert.equal(isWorkerAssigned({ assignedWorkers: [] }, workerId), false);
+  assert.equal(isWorkerAssigned({ assignedWorkers: [workerId] }, workerId), true);
+  assert.equal(isWorkerAssigned({ assignedWorkers: [{ _id: workerId }] }, workerId), true);
 });

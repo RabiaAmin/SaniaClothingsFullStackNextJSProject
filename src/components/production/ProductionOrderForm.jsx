@@ -219,7 +219,7 @@ export default function ProductionOrderForm({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Leave empty to allow any eligible worker to record production.
+                Leave empty to keep this production order unassigned.
               </p>
             </div>
           )}

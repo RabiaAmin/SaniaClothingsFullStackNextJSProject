@@ -4,6 +4,7 @@ const ProductionEntry = require('../models/productionEntry.model');
 const ProductionOrder = require('../models/productionOrder.model');
 const Notification = require('../models/notification.model');
 const notificationService = require('./notification.service');
+const { isWorkerAssigned } = require('./productionAssignment.service');
 const { NOTIFICATION_TYPES } = Notification;
 
 class ProductionEntryError extends Error {
@@ -28,14 +29,15 @@ async function submitProductionEntry({
   date,
   quantity,
   notes = '',
+  allowUnassignedOrder = false,
 }) {
   const order = await ProductionOrder.findById(productionOrderId);
   if (!order) throw new ProductionEntryError('Production order not found', 404);
   if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
     throw new ProductionEntryError('Production cannot be recorded against a closed order', 409);
   }
-  const assignedWorkerIds = (order.assignedWorkers ?? []).map(String);
-  if (assignedWorkerIds.length > 0 && !assignedWorkerIds.includes(String(workerId))) {
+  const hasAssignments = (order.assignedWorkers ?? []).length > 0;
+  if (!isWorkerAssigned(order, workerId) && (!allowUnassignedOrder || hasAssignments)) {
     throw new ProductionEntryError(
       'You are not assigned to this production order and cannot record production against it',
       403

@@ -49,6 +49,17 @@ async function resolveAssignedWorkerIds(value) {
   return uniqueIds;
 }
 
+function getNewlyAssignedWorkerIds(previousWorkerIds = [], nextWorkerIds = []) {
+  const previousIds = new Set(previousWorkerIds.map(String));
+  return [...new Set(nextWorkerIds.map(String))].filter((workerId) => !previousIds.has(workerId));
+}
+
+function isWorkerAssigned(order, workerId) {
+  return (order?.assignedWorkers ?? []).some(
+    (assignedWorker) => String(assignedWorker?._id ?? assignedWorker) === String(workerId)
+  );
+}
+
 async function notifyAssignedWorkers({ workerIds, order, actorId }) {
   if (workerIds.length === 0) return [];
   const itemCode = order.itemCode || 'Item code unavailable';
@@ -64,8 +75,10 @@ async function notifyAssignedWorkers({ workerIds, order, actorId }) {
 
 module.exports = {
   ProductionAssignmentError,
+  getNewlyAssignedWorkerIds,
   getAssignableWorkers,
   isEligibleWorker,
+  isWorkerAssigned,
   notifyAssignedWorkers,
   resolveAssignedWorkerIds,
 };

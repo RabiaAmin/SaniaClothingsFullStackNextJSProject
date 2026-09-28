@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Search,
+  UserPlus,
 } from 'lucide-react';
 import PermissionGuard from '@/components/auth/PermissionGuard';
 import EmptyState from '@/components/admin/EmptyState';
@@ -40,6 +41,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
+import ProductionOrderAssignmentDialog from '@/components/production/ProductionOrderAssignmentDialog';
 import { WorkerCardSkeleton, WorkerOrderCard } from '@/components/worker/WorkerMobileCards';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import {
@@ -104,6 +106,20 @@ function ProductionStatus({ order }) {
   );
 }
 
+function AssignmentStatus({ order }) {
+  const count = (order.assignedWorkers ?? []).length;
+  if (count === 0) return <Badge variant="outline">Unassigned</Badge>;
+
+  return (
+    <div className="space-y-1">
+      <Badge variant="secondary">Assigned</Badge>
+      <p className="text-xs text-muted-foreground">
+        {count} {count === 1 ? 'Worker' : 'Workers'}
+      </p>
+    </div>
+  );
+}
+
 function invoiceStatusVariant(status) {
   if (status === 'Paid') return 'success';
   if (status === 'Pending') return 'warning';
@@ -136,11 +152,14 @@ export default function ProductionOrdersPage() {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const showWorkerMobile = isWorkerView && isMobile;
   const canRecordProduction = hasPermission('production_entry.create');
+  const canAssignWorkers =
+    hasPermission('production_order.assign') && hasPermission('production_order.update');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [clientId, setClientId] = useState('all');
   const [page, setPage] = useState(1);
   const [workOrder, setWorkOrder] = useState(null);
+  const [assignmentOrder, setAssignmentOrder] = useState(null);
   const deferredSearch = useDeferredValue(search);
   const params = {
     page,
@@ -157,7 +176,6 @@ export default function ProductionOrdersPage() {
       (worker) => String(worker?._id ?? worker) === String(user?._id)
     )
   );
-  const availableOrders = orders.filter((order) => (order.assignedWorkers ?? []).length === 0);
 
   function resetPage(callback) {
     callback();
@@ -265,27 +283,6 @@ export default function ProductionOrdersPage() {
                   ))
                 )}
               </section>
-              <section className="space-y-3" aria-labelledby="available-orders-heading">
-                <div>
-                  <h2 id="available-orders-heading" className="font-semibold">
-                    Available Orders
-                  </h2>
-                  <p className="text-sm text-muted-foreground">Unassigned work you can record</p>
-                </div>
-                {availableOrders.length === 0 ? (
-                  <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                    No unassigned production orders are available.
-                  </p>
-                ) : (
-                  availableOrders.map((order) => (
-                    <WorkerOrderCard
-                      key={order._id}
-                      order={order}
-                      onAddWork={canRecordProduction ? setWorkOrder : undefined}
-                    />
-                  ))
-                )}
-              </section>
             </>
           )}
         </div>
@@ -296,7 +293,7 @@ export default function ProductionOrdersPage() {
           <CardContent className="p-0">
             {isLoading ? (
               <div className="p-6">
-                <TableSkeleton rows={6} cols={canReadInvoices ? 9 : 8} />
+                <TableSkeleton rows={6} cols={canReadInvoices ? 10 : 9} />
               </div>
             ) : error ? (
               <p className="p-6 text-sm text-destructive">{error.message}</p>
@@ -317,6 +314,7 @@ export default function ProductionOrdersPage() {
                     <TableHead>Production deadline</TableHead>
                     <TableHead>Rate</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Assignment</TableHead>
                     <TableHead>Progress</TableHead>
                     {canReadInvoices && <TableHead>Invoice</TableHead>}
                     <TableHead className="text-right">Actions</TableHead>
@@ -338,6 +336,9 @@ export default function ProductionOrdersPage() {
                         <ProductionStatus order={order} />
                       </TableCell>
                       <TableCell>
+                        <AssignmentStatus order={order} />
+                      </TableCell>
+                      <TableCell>
                         <ProgressSummary order={order} />
                       </TableCell>
                       {canReadInvoices && (
@@ -347,6 +348,15 @@ export default function ProductionOrdersPage() {
                       )}
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {canAssignWorkers && (order.assignedWorkers ?? []).length === 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAssignmentOrder(order)}
+                            >
+                              <UserPlus className="h-4 w-4" /> Assign Workers
+                            </Button>
+                          )}
                           <Button asChild variant="ghost" size="icon">
                             <Link
                               href={`/production-orders/${order._id}`}
@@ -404,6 +414,10 @@ export default function ProductionOrdersPage() {
         open={Boolean(workOrder)}
         onOpenChange={(nextOpen) => !nextOpen && setWorkOrder(null)}
         initialProductionOrderId={workOrder?._id}
+      />
+      <ProductionOrderAssignmentDialog
+        order={assignmentOrder}
+        onOpenChange={(nextOpen) => !nextOpen && setAssignmentOrder(null)}
       />
     </div>
   );

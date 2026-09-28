@@ -24,7 +24,7 @@ test.beforeEach(async ({ page, isMobile }) => {
 });
 
 test('worker mobile dashboard and navigation prioritize daily work', async ({ page }) => {
-  await mockApi(page, { user: workerUser });
+  await mockApi(page, { user: workerUser, assignedWorkerIds: ['user-worker'] });
   await page.goto('/dashboard');
 
   const navigation = page.getByRole('navigation', { name: 'Worker navigation' });
@@ -34,9 +34,7 @@ test('worker mobile dashboard and navigation prioritize daily work', async ({ pa
   await expect(navigation.getByRole('link', { name: 'Add Work' })).toBeVisible();
   await expect(navigation.getByRole('link', { name: 'Earnings' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Record Production' })).toBeVisible();
-  await expect(
-    page.getByLabel('Available Orders').getByText('Available production orders')
-  ).toBeVisible();
+  await expect(page.getByText('My Assigned Orders')).toBeVisible();
   await expect(page.getByTestId('worker-order-card-production-order-1')).toBeVisible({
     timeout: 20_000,
   });
@@ -52,7 +50,7 @@ test('worker mobile dashboard and navigation prioritize daily work', async ({ pa
 });
 
 test('worker records production from a preselected mobile order card', async ({ page }) => {
-  const calls = await mockApi(page, { user: workerUser });
+  const calls = await mockApi(page, { user: workerUser, assignedWorkerIds: ['user-worker'] });
   await page.goto('/production-orders');
 
   const orderCard = page.getByTestId('worker-order-card-production-order-1');

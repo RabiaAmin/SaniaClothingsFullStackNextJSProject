@@ -12,10 +12,38 @@ test('production order list supports progress, status, and PO search', async ({ 
   await expect(page.getByText('40 remaining')).toBeVisible();
   await expect(page.getByText('Aug 30, 2026')).toBeVisible();
   await expect(page.getByText('In Progress', { exact: true })).toBeVisible();
+  await expect(page.getByText('Unassigned', { exact: true })).toBeVisible();
   await expect(page.getByText('Invoice 1001')).toBeVisible();
   await expect(page.getByText('Sent', { exact: true })).toBeVisible();
   await page.getByPlaceholder('Search PO number or description').fill('PO-2026-001');
   await expect(page.getByText('PO-2026-001', { exact: true })).toBeVisible();
+});
+
+test('admin assigns workers to an unassigned order from the production order list', async ({
+  page,
+}) => {
+  const calls = await mockApi(page);
+  await signInAsAdmin(page);
+  await page.goto('/production-orders');
+
+  await page.getByRole('button', { name: 'Assign Workers' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Assign Workers' })).toBeVisible();
+  await dialog.getByRole('checkbox', { name: /worker worker@sania\.test/ }).check();
+  await dialog.getByRole('checkbox', { name: /worker-two worker2@sania\.test/ }).check();
+  await dialog.getByRole('button', { name: 'Save assignment' }).click();
+
+  await expect
+    .poll(() =>
+      calls.find(
+        (call) => call.method === 'PUT' && call.path === '/production-orders/production-order-1'
+      )
+    )
+    .toEqual(
+      expect.objectContaining({
+        payload: { assignedWorkerIds: ['user-worker', 'user-worker-2'] },
+      })
+    );
 });
 
 test('detail view safely explains when no invoice matches the PO number', async ({ page }) => {
@@ -165,6 +193,7 @@ test('worker can read orders but cannot create, edit, or query client administra
   page,
 }) => {
   const calls = await mockApi(page, {
+    assignedWorkerIds: ['user-worker'],
     user: {
       _id: 'user-worker',
       username: 'worker',

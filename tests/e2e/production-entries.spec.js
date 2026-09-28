@@ -19,7 +19,7 @@ const workerUser = {
 test('worker submits production for themselves with a server-owned rate snapshot', async ({
   page,
 }) => {
-  const calls = await mockApi(page, { user: workerUser });
+  const calls = await mockApi(page, { user: workerUser, assignedWorkerIds: ['user-worker'] });
   await signInAsAdmin(page);
   await page.goto('/production-entries');
 
@@ -54,7 +54,11 @@ test('worker submits production for themselves with a server-owned rate snapshot
 });
 
 test('record production handles an older order without an item code', async ({ page }) => {
-  await mockApi(page, { user: workerUser, includeLegacyProductionOrder: true });
+  await mockApi(page, {
+    user: workerUser,
+    assignedWorkerIds: ['user-worker'],
+    includeLegacyProductionOrder: true,
+  });
   await signInAsAdmin(page);
   await page.goto('/production-entries');
 

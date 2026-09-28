@@ -235,7 +235,7 @@ export default function ProductionOrderDetailPage() {
             <div className="sm:col-span-2">
               <p className="text-muted-foreground">Assigned workers</p>
               {(order.assignedWorkers ?? []).length === 0 ? (
-                <p className="font-medium">Open to eligible workers</p>
+                <p className="font-medium">Unassigned</p>
               ) : (
                 <div className="mt-1 flex flex-wrap gap-2">
                   {order.assignedWorkers.map((worker, index) => (

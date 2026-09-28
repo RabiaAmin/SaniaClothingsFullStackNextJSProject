@@ -57,9 +57,10 @@ export default function ProductionEntryFormDialog({
         const assignedWorkerIds = (order.assignedWorkers ?? []).map((worker) =>
           String(worker?._id ?? worker)
         );
+        if (isWorkerView) return assignedWorkerIds.includes(String(user?._id));
         return assignedWorkerIds.length === 0 || assignedWorkerIds.includes(String(user?._id));
       }),
-    [orders, user?._id]
+    [isWorkerView, orders, user?._id]
   );
   const selectedOrder = useMemo(
     () => orders.find((order) => order._id === productionOrderId) ?? entry?.productionOrder,
