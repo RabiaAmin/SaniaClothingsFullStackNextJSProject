@@ -15,23 +15,38 @@ test('production order list supports progress, status, and PO search', async ({ 
   await expect(page.getByText('Unassigned', { exact: true })).toBeVisible();
   await expect(page.getByText('Invoice 1001')).toBeVisible();
   await expect(page.getByText('Sent', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Assign Workers' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Edit PO-2026-001' })).toBeVisible();
+
+  if (page.viewportSize().width >= 768) {
+    const tableContainer = page.getByRole('table').locator('..');
+    await expect
+      .poll(() =>
+        tableContainer.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
+      )
+      .toBe(true);
+  }
+
   await page.getByPlaceholder('Search PO number or description').fill('PO-2026-001');
   await expect(page.getByText('PO-2026-001', { exact: true })).toBeVisible();
 });
 
-test('admin assigns workers to an unassigned order from the production order list', async ({
-  page,
-}) => {
+test('admin assigns workers to an unassigned order through Edit', async ({ page }) => {
   const calls = await mockApi(page);
   await signInAsAdmin(page);
   await page.goto('/production-orders');
 
-  await page.getByRole('button', { name: 'Assign Workers' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Assign Workers' })).toBeVisible();
-  await dialog.getByRole('checkbox', { name: /worker worker@sania\.test/ }).check();
-  await dialog.getByRole('checkbox', { name: /worker-two worker2@sania\.test/ }).check();
-  await dialog.getByRole('button', { name: 'Save assignment' }).click();
+  await expect(page.getByRole('button', { name: 'Assign Workers' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Edit PO-2026-001' }).press('Enter');
+  await expect(page).toHaveURL(/\/production-orders\/production-order-1\/edit$/, {
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('heading', { name: 'Edit Production Order' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole('checkbox', { name: /worker worker@sania\.test/ }).check();
+  await page.getByRole('checkbox', { name: /worker-two worker2@sania\.test/ }).check();
+  await page.getByRole('button', { name: 'Save Changes' }).click();
 
   await expect
     .poll(() =>
@@ -41,7 +56,9 @@ test('admin assigns workers to an unassigned order from the production order lis
     )
     .toEqual(
       expect.objectContaining({
-        payload: { assignedWorkerIds: ['user-worker', 'user-worker-2'] },
+        payload: expect.objectContaining({
+          assignedWorkerIds: ['user-worker', 'user-worker-2'],
+        }),
       })
     );
 });

@@ -11,7 +11,6 @@ import {
   Pencil,
   Plus,
   Search,
-  UserPlus,
 } from 'lucide-react';
 import PermissionGuard from '@/components/auth/PermissionGuard';
 import EmptyState from '@/components/admin/EmptyState';
@@ -41,7 +40,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
-import ProductionOrderAssignmentDialog from '@/components/production/ProductionOrderAssignmentDialog';
 import { WorkerCardSkeleton, WorkerOrderCard } from '@/components/worker/WorkerMobileCards';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import {
@@ -56,7 +54,7 @@ function ProgressSummary({ order }) {
   const tracking = productionOrderTracking(order);
 
   return (
-    <div className="min-w-44 space-y-1.5">
+    <div className="space-y-1.5">
       <div className="h-2 overflow-hidden rounded-full bg-muted">
         <div
           className={`h-full rounded-full ${productionOrderProgressColor(order)}`}
@@ -152,14 +150,11 @@ export default function ProductionOrdersPage() {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const showWorkerMobile = isWorkerView && isMobile;
   const canRecordProduction = hasPermission('production_entry.create');
-  const canAssignWorkers =
-    hasPermission('production_order.assign') && hasPermission('production_order.update');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [clientId, setClientId] = useState('all');
   const [page, setPage] = useState(1);
   const [workOrder, setWorkOrder] = useState(null);
-  const [assignmentOrder, setAssignmentOrder] = useState(null);
   const deferredSearch = useDeferredValue(search);
   const params = {
     page,
@@ -305,19 +300,19 @@ export default function ProductionOrdersPage() {
                 className="m-6"
               />
             ) : (
-              <Table>
+              <Table className="md:table-fixed [&_td]:break-words [&_td]:px-2 [&_th]:px-2">
                 <TableHeader>
                   <TableRow>
                     <TableHead>PO Number</TableHead>
                     <TableHead>Client</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Production deadline</TableHead>
-                    <TableHead>Rate</TableHead>
+                    <TableHead className="md:w-[14%]">Description</TableHead>
+                    <TableHead className="md:w-28">Production deadline</TableHead>
+                    <TableHead className="md:w-20">Rate</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Assignment</TableHead>
-                    <TableHead>Progress</TableHead>
+                    <TableHead className="md:w-24">Assignment</TableHead>
+                    <TableHead className="md:w-[15%]">Progress</TableHead>
                     {canReadInvoices && <TableHead>Invoice</TableHead>}
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right md:w-20">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -325,7 +320,7 @@ export default function ProductionOrdersPage() {
                     <TableRow key={order._id}>
                       <TableCell className="font-mono font-semibold">{order.poNumber}</TableCell>
                       <TableCell>{order.client?.name ?? 'Unknown client'}</TableCell>
-                      <TableCell className="max-w-64 truncate">
+                      <TableCell className="whitespace-normal">
                         {order.productionDescription}
                       </TableCell>
                       <TableCell>
@@ -348,15 +343,6 @@ export default function ProductionOrdersPage() {
                       )}
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          {canAssignWorkers && (order.assignedWorkers ?? []).length === 0 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setAssignmentOrder(order)}
-                            >
-                              <UserPlus className="h-4 w-4" /> Assign Workers
-                            </Button>
-                          )}
                           <Button asChild variant="ghost" size="icon">
                             <Link
                               href={`/production-orders/${order._id}`}
@@ -414,10 +400,6 @@ export default function ProductionOrdersPage() {
         open={Boolean(workOrder)}
         onOpenChange={(nextOpen) => !nextOpen && setWorkOrder(null)}
         initialProductionOrderId={workOrder?._id}
-      />
-      <ProductionOrderAssignmentDialog
-        order={assignmentOrder}
-        onOpenChange={(nextOpen) => !nextOpen && setAssignmentOrder(null)}
       />
     </div>
   );
