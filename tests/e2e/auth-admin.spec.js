@@ -163,27 +163,36 @@ test('invoice view renders every business detail from the API response', async (
   await expect(invoice.getByText('hello@sania.test')).toBeVisible();
 });
 
-test('invoice view displays the current local date without updating the stored date', async ({
+test('invoice view, print, and PDF use the saved invoice date without updating it', async ({
   page,
 }) => {
+  test.setTimeout(60_000);
+  await page.clock.setFixedTime(new Date('2026-09-25T10:00:00.000Z'));
+  await page.addInitScript(() => {
+    window.print = () => {
+      window.__printedInvoiceText = document.querySelector('#invoice-print')?.innerText ?? '';
+    };
+  });
   const calls = await mockApi(page);
   await signInAsAdmin(page);
 
   await page.goto('/invoices/invoice-1');
-  const today = await page.evaluate(() =>
-    new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    }).format(new Date())
-  );
   const invoice = page.locator('#invoice-print');
 
-  await expect(invoice.getByText(today, { exact: true })).toBeVisible();
-  await expect(invoice.getByText('Jun 1, 2026', { exact: true })).toHaveCount(0);
+  await expect(invoice.getByText('Jun 1, 2026', { exact: true })).toBeVisible();
+  await expect(invoice.getByText('Sep 25, 2026', { exact: true })).toHaveCount(0);
 
-  await page.reload();
-  await expect(page.locator('#invoice-print').getByText(today, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Print' }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.__printedInvoiceText))
+    .toContain('Jun 1, 2026');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('invoice-1001.pdf');
+
+  await expect(invoice.getByText('Jun 1, 2026', { exact: true })).toBeVisible();
   expect(
     calls.some(
       (call) => call.method === 'PUT' && call.path === '/business/invoice/update/invoice-1'
