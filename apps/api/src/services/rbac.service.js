@@ -34,6 +34,7 @@ const PERMISSIONS = [
   ['product.*', 'product', '*', 'Manage catalogue products'],
   ['business.*', 'business', '*', 'Manage the business profile'],
   ['bank_account.*', 'bank_account', '*', 'Manage bank accounts'],
+  ['cmt_price.*', 'cmt_price', '*', 'Manage the internal CMT price list'],
   ['user.*', 'user', '*', 'Manage users and role assignments'],
   ['role.*', 'role', '*', 'Manage roles and permissions'],
 ];

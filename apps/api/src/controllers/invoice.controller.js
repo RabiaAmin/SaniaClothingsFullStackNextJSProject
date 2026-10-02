@@ -5,34 +5,29 @@ const asyncHandler = require('../utils/asyncHandler');
 const { escapeRegex } = require('../utils/query');
 const { createInvoiceWithGeneratedNumber } = require('../services/invoiceNumber.service');
 const { generateInvoiceStatements } = require('../services/invoiceStatement.service');
+const {
+  priceNewInvoiceItems,
+  priceUpdatedInvoiceItems,
+  calculateInvoiceTotals,
+} = require('../services/cmtPrice.service');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
-  const {
-    fromBusiness,
-    toClient,
-    items,
-    subTotal,
-    totalAmount,
-    category,
-    date,
-    poNumber,
-    tax,
-    status,
-  } = req.body;
+  const { fromBusiness, toClient, items, category, date, poNumber, tax, status } = req.body;
 
-  if (!fromBusiness || !toClient || !items || !subTotal || !totalAmount || !category) {
+  if (!fromBusiness || !toClient || !items || !category) {
     return res.status(400).json({ success: false, message: 'Please provide all required fields' });
   }
+
+  const pricedItems = await priceNewInvoiceItems(items);
+  const totals = calculateInvoiceTotals(pricedItems, tax);
 
   const invoice = await createInvoiceWithGeneratedNumber({
     poNumber,
     date: date || Date.now(),
     fromBusiness,
     toClient,
-    items,
-    subTotal,
-    tax: tax || 0,
-    totalAmount,
+    items: pricedItems,
+    ...totals,
     category,
     status: status || 'Pending',
   });
@@ -47,18 +42,15 @@ exports.updateInvoice = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Invoice not found' });
   }
 
-  const fields = [
-    'fromBusiness',
-    'toClient',
-    'items',
-    'subTotal',
-    'tax',
-    'totalAmount',
-    'category',
-    'date',
-    'poNumber',
-    'status',
-  ];
+  if (req.body.items !== undefined) {
+    invoice.items = await priceUpdatedInvoiceItems(invoice.items, req.body.items);
+    const totals = calculateInvoiceTotals(invoice.items, req.body.tax ?? invoice.tax);
+    invoice.subTotal = totals.subTotal;
+    invoice.tax = totals.tax;
+    invoice.totalAmount = totals.totalAmount;
+  }
+
+  const fields = ['fromBusiness', 'toClient', 'category', 'date', 'poNumber', 'status'];
 
   fields.forEach((field) => {
     if (req.body[field] !== undefined) invoice[field] = req.body[field];

@@ -52,6 +52,33 @@ const products = [
   },
 ];
 
+const cmtPrices = [
+  {
+    _id: 'cmt-1',
+    itemCode: 'JK001',
+    style: 'Denim Work Jacket',
+    cmtPrice: 25,
+    workerPrice: 15,
+    isActive: true,
+  },
+  {
+    _id: 'cmt-2',
+    itemCode: 'JK002',
+    style: 'Blue Denim Jacket',
+    cmtPrice: 26.5,
+    workerPrice: 15.5,
+    isActive: true,
+  },
+  {
+    _id: 'cmt-9',
+    itemCode: 'JK009',
+    style: 'Updated Jacket',
+    cmtPrice: 28,
+    workerPrice: 16,
+    isActive: true,
+  },
+];
+
 const bankAccounts = [
   {
     _id: 'bank-1',
@@ -536,6 +563,48 @@ async function mockApi(page, options = {}) {
       return response(route, { success: true, notification });
     }
 
+    if (method === 'GET' && path === '/cmt-prices') {
+      return response(route, { success: true, cmtPrices });
+    }
+    if (method === 'GET' && path.startsWith('/cmt-prices/lookup/')) {
+      const itemCode = decodeURIComponent(path.split('/').pop()).trim().toUpperCase();
+      const entry = cmtPrices.find((price) => price.itemCode === itemCode);
+      if (!entry) {
+        return response(
+          route,
+          { success: false, message: 'Item code not found in CMT Price List.' },
+          400
+        );
+      }
+      const usage = url.searchParams.get('usage');
+      return response(route, {
+        success: true,
+        price:
+          usage === 'invoice'
+            ? { itemCode: entry.itemCode, style: entry.style, cmtPrice: entry.cmtPrice }
+            : { itemCode: entry.itemCode, style: entry.style, workerPrice: entry.workerPrice },
+      });
+    }
+    if (method === 'POST' && path === '/cmt-prices') {
+      const payload = await readPayload(route);
+      const entry = { ...payload, _id: `cmt-${cmtPrices.length + 1}` };
+      cmtPrices.push(entry);
+      return response(route, { success: true, cmtPrice: entry }, 201);
+    }
+    if (method === 'PUT' && path.startsWith('/cmt-prices/')) {
+      const payload = await readPayload(route);
+      const id = path.split('/').pop();
+      const index = cmtPrices.findIndex((price) => price._id === id);
+      if (index !== -1) cmtPrices[index] = { ...cmtPrices[index], ...payload };
+      return response(route, { success: true, cmtPrice: cmtPrices[index] });
+    }
+    if (method === 'DELETE' && path.startsWith('/cmt-prices/')) {
+      const id = path.split('/').pop();
+      const index = cmtPrices.findIndex((price) => price._id === id);
+      if (index !== -1) cmtPrices.splice(index, 1);
+      return response(route, { success: true });
+    }
+
     if (method === 'GET' && path === '/production-orders/eligible-workers') {
       return response(route, { success: true, workers: [worker, secondWorker] });
     }
@@ -598,7 +667,12 @@ async function mockApi(page, options = {}) {
         route,
         {
           success: true,
-          productionOrder: { ...productionOrder, ...payload, _id: 'production-order-created' },
+          productionOrder: {
+            ...productionOrder,
+            ...payload,
+            workerRate: cmtPrices.find((price) => price.itemCode === payload.itemCode)?.workerPrice,
+            _id: 'production-order-created',
+          },
         },
         201
       );

@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/useToast';
+import { useCmtPriceLookup } from '@/hooks/useCmtPrices';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -52,14 +54,51 @@ export default function ProductionOrderForm({
 }) {
   const [form, setForm] = useState(() => initialForm(productionOrder, workers));
   const [assignmentsChanged, setAssignmentsChanged] = useState(false);
+  const [priceState, setPriceState] = useState(null);
+  const priceLookup = useCmtPriceLookup();
 
   useEffect(() => {
     setForm(initialForm(productionOrder, workers));
     setAssignmentsChanged(false);
+    setPriceState(null);
   }, [productionOrder, workers]);
 
   function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      if (field !== 'itemCode') return { ...current, [field]: value };
+      const unchanged =
+        productionOrder &&
+        value.trim().toUpperCase() === productionOrder.itemCode?.trim().toUpperCase();
+      return {
+        ...current,
+        itemCode: value,
+        workerRate: unchanged ? productionOrder.workerRate : '',
+      };
+    });
+    if (field === 'itemCode') setPriceState(null);
+  }
+
+  async function findWorkerPrice() {
+    const itemCode = form.itemCode.trim();
+    if (!itemCode) return;
+    if (
+      productionOrder &&
+      itemCode.toUpperCase() === productionOrder.itemCode?.trim().toUpperCase()
+    ) {
+      return;
+    }
+    setPriceState({ loading: true });
+    try {
+      const price = await priceLookup.mutateAsync({ itemCode, usage: 'production' });
+      setForm((current) => ({
+        ...current,
+        itemCode: price.itemCode,
+        workerRate: price.workerPrice,
+      }));
+      setPriceState({ success: true, style: price.style });
+    } catch (error) {
+      setPriceState({ error: error.message });
+    }
   }
 
   function selectProduct(productId) {
@@ -84,7 +123,7 @@ export default function ProductionOrderForm({
     }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     if (
       !form.poNumber.trim() ||
@@ -101,24 +140,42 @@ export default function ProductionOrderForm({
       toast({ title: 'Ordered quantity must be a positive whole number', variant: 'destructive' });
       return;
     }
-    if (form.workerRate === '' || Number(form.workerRate) < 0) {
-      toast({ title: 'Worker rate must be zero or greater', variant: 'destructive' });
-      return;
+    let resolvedItemCode = form.itemCode.trim();
+    if (form.workerRate === '') {
+      try {
+        const price = await priceLookup.mutateAsync({
+          itemCode: form.itemCode.trim(),
+          usage: 'production',
+        });
+        setForm((current) => ({
+          ...current,
+          itemCode: price.itemCode,
+          workerRate: price.workerPrice,
+        }));
+        setPriceState({ success: true, style: price.style });
+        resolvedItemCode = price.itemCode;
+      } catch (error) {
+        setPriceState({ error: error.message });
+        toast({ title: error.message, variant: 'destructive' });
+        return;
+      }
     }
     if (new Date(form.dueDate) < new Date(form.startDate)) {
       toast({ title: 'Due date cannot be before the start date', variant: 'destructive' });
       return;
     }
 
-    const { assignedWorkerIds, ...fields } = form;
+    const fields = { ...form };
+    const assignedWorkerIds = fields.assignedWorkerIds;
+    delete fields.assignedWorkerIds;
+    delete fields.workerRate;
     onSubmit({
       ...fields,
       productId: form.productId === 'none' ? null : form.productId,
       poNumber: form.poNumber.trim(),
-      itemCode: form.itemCode.trim(),
+      itemCode: resolvedItemCode,
       productionDescription: form.productionDescription.trim(),
       orderedQuantity: Number(form.orderedQuantity),
-      workerRate: Number(form.workerRate),
       notes: form.notes.trim(),
       ...(canAssignWorkers && (!productionOrder || assignmentsChanged) && { assignedWorkerIds }),
     });
@@ -146,9 +203,18 @@ export default function ProductionOrderForm({
               id="itemCode"
               value={form.itemCode}
               onChange={(event) => updateField('itemCode', event.target.value)}
+              onBlur={findWorkerPrice}
               placeholder="JK001"
             />
-            <p className="text-xs text-muted-foreground">Item codes are stored in uppercase.</p>
+            {priceState?.loading ? (
+              <p className="text-xs text-muted-foreground">Finding item price...</p>
+            ) : priceState?.error ? (
+              <p className="text-xs text-destructive">{priceState.error}</p>
+            ) : priceState?.success ? (
+              <p className="text-xs text-green-700">{priceState.style}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Item codes are stored in uppercase.</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Client *</Label>
@@ -247,8 +313,13 @@ export default function ProductionOrderForm({
               min="0"
               step="0.01"
               value={form.workerRate}
-              onChange={(event) => updateField('workerRate', event.target.value)}
+              readOnly
             />
+            <p className="text-xs text-muted-foreground">
+              {form.workerRate === ''
+                ? 'Enter a valid Item Code to retrieve the current Worker Price.'
+                : `Worker Price snapshot: ${formatCurrency(form.workerRate)}`}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="startDate">Start date *</Label>

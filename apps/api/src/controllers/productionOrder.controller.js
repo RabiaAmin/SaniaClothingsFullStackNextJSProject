@@ -23,6 +23,7 @@ const {
 } = require('../services/productionAssignment.service');
 const { PRODUCTION_ORDER_STATUSES } = ProductionOrder;
 const { escapeRegex } = require('../utils/query');
+const { getPriceByItemCode } = require('../services/cmtPrice.service');
 
 const POPULATE_FIELDS = [
   { path: 'client', select: 'name email phone' },
@@ -35,12 +36,6 @@ const POPULATE_FIELDS = [
 function parsePositiveInteger(value) {
   const number = Number(value);
   return Number.isInteger(number) && number > 0 ? number : null;
-}
-
-function parseNonNegativeNumber(value) {
-  if (value === '' || value === null || value === undefined) return null;
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
 function isValidDate(value) {
@@ -117,7 +112,6 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
     productId,
     productionDescription,
     orderedQuantity,
-    workerRate,
     startDate,
     dueDate,
     status,
@@ -128,7 +122,6 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
   const normalizedItemCode = normalizeItemCode(itemCode);
   const assignments = (await resolveRequestedAssignments(req, assignedWorkerIds)) ?? [];
   const parsedQuantity = parsePositiveInteger(orderedQuantity);
-  const parsedRate = parseNonNegativeNumber(workerRate);
   if (!normalizedPoNumber || !normalizedItemCode || !clientId || !startDate || !dueDate) {
     return res.status(400).json({ success: false, message: 'Please provide all required fields' });
   }
@@ -143,9 +136,7 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
       .status(400)
       .json({ success: false, message: 'Ordered quantity must be a positive whole number' });
   }
-  if (parsedRate === null) {
-    return res.status(400).json({ success: false, message: 'Worker rate must be zero or greater' });
-  }
+  const currentPrice = await getPriceByItemCode(normalizedItemCode);
 
   const { product, error } = await validateReferences(clientId, productId);
   if (error) return res.status(400).json({ success: false, message: error });
@@ -172,7 +163,7 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
     product: productId || null,
     productionDescription: description,
     orderedQuantity: parsedQuantity,
-    workerRate: parsedRate,
+    workerRate: currentPrice.workerPrice,
     startDate,
     dueDate,
     status: status || 'PENDING',
@@ -301,7 +292,11 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
     if (!itemCode) {
       return res.status(400).json({ success: false, message: 'Item code is required' });
     }
-    productionOrder.itemCode = itemCode;
+    if (itemCode !== productionOrder.itemCode) {
+      const currentPrice = await getPriceByItemCode(itemCode);
+      productionOrder.itemCode = itemCode;
+      productionOrder.workerRate = currentPrice.workerPrice;
+    }
   }
   if (assignments !== null) productionOrder.assignedWorkers = assignments;
 
@@ -342,16 +337,6 @@ exports.updateProductionOrder = asyncHandler(async (req, res) => {
     }
     productionOrder.orderedQuantity = quantity;
   }
-  if (req.body.workerRate !== undefined) {
-    const rate = parseNonNegativeNumber(req.body.workerRate);
-    if (rate === null) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Worker rate must be zero or greater' });
-    }
-    productionOrder.workerRate = rate;
-  }
-
   ['startDate', 'dueDate', 'status', 'notes'].forEach((field) => {
     if (req.body[field] !== undefined) productionOrder[field] = req.body[field];
   });

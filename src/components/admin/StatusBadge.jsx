@@ -11,6 +11,7 @@ const STATUS_MAP = {
   non_vat: { label: 'Non-VAT', classes: 'bg-gray-100   text-gray-700   border-gray-200' },
   // Generic
   active: { label: 'Active', classes: 'bg-green-100 text-green-700 border-green-200' },
+  inactive: { label: 'Inactive', classes: 'bg-gray-100 text-gray-700 border-gray-200' },
   default: { label: 'Default', classes: 'bg-primary/10 text-primary   border-primary/20' },
 };
 

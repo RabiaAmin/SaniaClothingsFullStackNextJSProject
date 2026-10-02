@@ -101,7 +101,7 @@ test('admin can create a production order independently from invoices', async ({
   await page.getByRole('option', { name: 'Denim Work Jacket' }).click();
   await page.getByLabel('Production description *').fill('Blue denim jackets');
   await page.getByLabel('Ordered quantity *').fill('120');
-  await page.getByLabel('Worker rate per approved unit *').fill('15.50');
+  await expect(page.getByLabel('Worker rate per approved unit *')).toHaveValue('15.5');
   await page.getByLabel('Start date *').fill('2026-09-01');
   await page.getByLabel('Due date *').fill('2026-09-30');
   await page.getByLabel('Notes').fill('Production-only instructions');
@@ -116,11 +116,10 @@ test('admin can create a production order independently from invoices', async ({
       expect.objectContaining({
         payload: expect.objectContaining({
           poNumber: 'po-2026-002',
-          itemCode: 'jk002',
+          itemCode: 'JK002',
           clientId: 'client-1',
           productId: 'prod-1',
           orderedQuantity: 120,
-          workerRate: 15.5,
           assignedWorkerIds: [],
         }),
       })
@@ -160,6 +159,8 @@ test('admin can view and update a production order item code', async ({ page }) 
   const itemCode = page.getByLabel('Item Code *');
   await expect(itemCode).toHaveValue('JK001');
   await itemCode.fill('jk009');
+  await itemCode.blur();
+  await expect(page.getByLabel('Worker rate per approved unit *')).toHaveValue('16');
   await page.getByRole('button', { name: 'Save Changes' }).click();
 
   await expect

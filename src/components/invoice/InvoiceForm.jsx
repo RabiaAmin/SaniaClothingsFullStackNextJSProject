@@ -16,11 +16,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Plus, X, Building2 } from 'lucide-react';
+import { useCmtPriceLookup } from '@/hooks/useCmtPrices';
 
 const CATEGORIES = ['Finished Garments', 'CMT Services', 'Other Income'];
 const STATUSES = ['Pending', 'Sent', 'Paid'];
 
-const EMPTY_ITEM = () => ({ description: '', quantity: 1, unitPrice: '' });
+const EMPTY_ITEM = () => ({
+  description: '',
+  quantity: 1,
+  unitPrice: '',
+  originalDescription: '',
+  snapshotUnitPrice: null,
+});
 
 function todayISO() {
   return new Date().toISOString().split('T')[0];
@@ -36,6 +43,8 @@ export default function InvoiceForm({
 }) {
   const { data: bizRaw } = useFetch(() => businessApi.getBusiness());
   const business = bizRaw?.business ?? null;
+  const priceLookup = useCmtPriceLookup();
+  const [priceStates, setPriceStates] = useState({});
 
   const [form, setForm] = useState({
     poNumber: defaultValues?.poNumber ?? '',
@@ -51,6 +60,8 @@ export default function InvoiceForm({
         description: i.description ?? '',
         quantity: i.quantity ?? 1,
         unitPrice: i.unitPrice ?? '',
+        originalDescription: i.description ?? '',
+        snapshotUnitPrice: i.unitPrice ?? '',
       }));
     }
     return [EMPTY_ITEM()];
@@ -80,7 +91,51 @@ export default function InvoiceForm({
   }
 
   function updateItem(idx, field, value) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
+    setItems((prev) =>
+      prev.map((it, i) => {
+        if (i !== idx) return it;
+        if (field !== 'description') return { ...it, [field]: value };
+        const returnsToSnapshot =
+          value.trim().toUpperCase() === it.originalDescription.trim().toUpperCase();
+        return {
+          ...it,
+          description: value,
+          unitPrice: returnsToSnapshot ? it.snapshotUnitPrice : '',
+        };
+      })
+    );
+    if (field === 'description') {
+      setPriceStates((current) => ({ ...current, [idx]: null }));
+    }
+  }
+
+  async function findItemPrice(idx) {
+    const item = items[idx];
+    const itemCode = item.description.trim();
+    if (!itemCode) return;
+    if (
+      item.originalDescription &&
+      itemCode.toUpperCase() === item.originalDescription.trim().toUpperCase()
+    ) {
+      return;
+    }
+    setPriceStates((current) => ({ ...current, [idx]: { loading: true } }));
+    try {
+      const price = await priceLookup.mutateAsync({ itemCode, usage: 'invoice' });
+      setItems((current) =>
+        current.map((entry, entryIndex) =>
+          entryIndex === idx
+            ? { ...entry, description: price.itemCode, unitPrice: price.cmtPrice }
+            : entry
+        )
+      );
+      setPriceStates((current) => ({
+        ...current,
+        [idx]: { success: true, style: price.style },
+      }));
+    } catch (error) {
+      setPriceStates((current) => ({ ...current, [idx]: { error: error.message } }));
+    }
   }
 
   function addItem() {
@@ -217,7 +272,7 @@ export default function InvoiceForm({
         <Label>Line Items *</Label>
         <div className="rounded-lg border p-4 space-y-3">
           <div className="grid grid-cols-12 gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span className="col-span-5">Description</span>
+            <span className="col-span-5">Item Code</span>
             <span className="col-span-2 text-center">Qty</span>
             <span className="col-span-2 text-right">Unit Price</span>
             <span className="col-span-2 text-right">Amount</span>
@@ -227,41 +282,56 @@ export default function InvoiceForm({
           {items.map((it, idx) => {
             const amount = (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
             return (
-              <div key={idx} className="grid grid-cols-12 items-center gap-2">
-                <Input
-                  className="col-span-5 h-8 text-sm"
-                  placeholder="Description"
-                  value={it.description}
-                  onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                  required
-                />
-                <Input
-                  className="col-span-2 h-8 text-center text-sm"
-                  type="number"
-                  min="1"
-                  value={it.quantity}
-                  onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                />
-                <Input
-                  className="col-span-2 h-8 text-right text-sm"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={it.unitPrice}
-                  onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
-                />
-                <div className="col-span-2 text-right text-sm font-medium tabular-nums">
-                  {formatCurrency(amount)}
+              <div key={idx} className="space-y-1">
+                <div className="grid grid-cols-12 items-center gap-2">
+                  <Input
+                    className="col-span-5 h-8 text-sm"
+                    placeholder="Description"
+                    value={it.description}
+                    onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                    onBlur={() => findItemPrice(idx)}
+                    required
+                  />
+                  <Input
+                    className="col-span-2 h-8 text-center text-sm"
+                    type="number"
+                    min="1"
+                    value={it.quantity}
+                    onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                  />
+                  <Input
+                    className="col-span-2 h-8 text-right text-sm"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={it.unitPrice}
+                    readOnly
+                    required
+                  />
+                  <div className="col-span-2 text-right text-sm font-medium tabular-nums">
+                    {formatCurrency(amount)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(idx)}
+                    disabled={items.length === 1}
+                    className="col-span-1 flex justify-center text-muted-foreground hover:text-destructive disabled:opacity-30"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeItem(idx)}
-                  disabled={items.length === 1}
-                  className="col-span-1 flex justify-center text-muted-foreground hover:text-destructive disabled:opacity-30"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                {priceStates[idx]?.loading && (
+                  <p className="col-span-12 text-xs text-muted-foreground">Finding item price...</p>
+                )}
+                {priceStates[idx]?.success && (
+                  <p className="col-span-12 text-xs text-green-700">
+                    {priceStates[idx].style} · CMT Price: {formatCurrency(it.unitPrice)}
+                  </p>
+                )}
+                {priceStates[idx]?.error && (
+                  <p className="col-span-12 text-xs text-destructive">{priceStates[idx].error}</p>
+                )}
               </div>
             );
           })}

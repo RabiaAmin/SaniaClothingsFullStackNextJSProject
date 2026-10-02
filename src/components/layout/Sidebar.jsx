@@ -23,6 +23,7 @@ import {
   ClipboardCheck,
   Banknote,
   History,
+  Tags,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -54,6 +55,7 @@ const NAV_ITEMS = [
     anyPermission: ['payroll.read_own', 'payroll.read_all'],
   },
   { href: '/clients', label: 'Client Manager', icon: Users, permission: 'client.read' },
+  { href: '/cmt-prices', label: 'CMT Price List', icon: Tags, permission: 'cmt_price.read' },
   { href: '/admin/products', label: 'Products', icon: Package, permission: 'product.read' },
   { href: '/business', label: 'Business Profile', icon: Building2, permission: 'business.read' },
   {
