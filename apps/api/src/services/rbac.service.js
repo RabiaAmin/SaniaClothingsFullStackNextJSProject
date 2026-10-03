@@ -30,6 +30,7 @@ const PERMISSIONS = [
   ['payroll.read_all', 'payroll', 'read_all', 'View all worker payroll reports'],
   ['payroll.export_pdf', 'payroll', 'export_pdf', 'Generate admin payroll PDF reports'],
   ['invoice.*', 'invoice', '*', 'Manage invoices and statements'],
+  ['invoice.archive', 'invoice', 'archive', 'Archive and permanently delete retained invoices'],
   ['client.*', 'client', '*', 'Manage clients'],
   ['product.*', 'product', '*', 'Manage catalogue products'],
   ['business.*', 'business', '*', 'Manage the business profile'],

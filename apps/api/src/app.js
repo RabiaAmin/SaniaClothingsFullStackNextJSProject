@@ -19,6 +19,7 @@ const productionEntryRoutes = require('./routes/productionEntry.routes');
 const payrollRoutes = require('./routes/payroll.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const cmtPriceRoutes = require('./routes/cmtPrice.routes');
+const invoiceArchiveRoutes = require('./routes/invoiceArchive.routes');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -69,6 +70,7 @@ app.use('/api/v1/production-entries', productionEntryRoutes);
 app.use('/api/v1/payroll', payrollRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/cmt-prices', cmtPriceRoutes);
+app.use('/api/v1/invoice-archives', invoiceArchiveRoutes);
 
 app.use(errorHandler);
 

@@ -13,12 +13,13 @@ import InvoiceTable from '@/components/invoice/InvoiceTable';
 import InvoiceFilters from '@/components/invoice/InvoiceFilters';
 
 import { Button } from '@/components/ui/button';
-import { History, Plus, Send } from 'lucide-react';
+import { Archive, History, Plus, Send } from 'lucide-react';
 
 export default function InvoicesPage() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('invoice.create');
   const canDelete = hasPermission('invoice.delete');
+  const canArchive = hasPermission('invoice.archive');
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -89,6 +90,13 @@ export default function InvoicesPage() {
           {data?.totalRecords != null ? `${data.totalRecords} invoices` : ''}
         </p>
         <div className="flex gap-2">
+          {canArchive && (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/invoices/archive">
+                <Archive className="h-4 w-4" /> Retention Archive
+              </Link>
+            </Button>
+          )}
           <Button asChild variant="outline" size="sm">
             <Link href="/invoices/statements/history">
               <History className="h-4 w-4" /> Statement History

@@ -21,6 +21,7 @@ export const ROUTE_PERMISSIONS = [
   { match: /^\/admin\/products\/[^/]+\/edit$/, permission: 'product.update' },
   { path: '/admin/products', permission: 'product.read' },
   { path: '/invoices/create', permission: 'invoice.create' },
+  { path: '/invoices/archive', permission: 'invoice.archive' },
   { match: /^\/invoices\/[^/]+\/edit$/, permission: 'invoice.update' },
   { path: '/invoices', permission: 'invoice.read' },
   { path: '/production-orders/create', permission: 'production_order.create' },

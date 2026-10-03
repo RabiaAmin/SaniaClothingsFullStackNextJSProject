@@ -10,6 +10,7 @@ const {
   priceUpdatedInvoiceItems,
   calculateInvoiceTotals,
 } = require('../services/cmtPrice.service');
+const { isEligibleInvoiceDate } = require('../services/invoiceArchive.service');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
   const { fromBusiness, toClient, items, category, date, poNumber, tax, status } = req.body;
@@ -66,6 +67,15 @@ exports.deleteInvoice = asyncHandler(async (req, res) => {
 
   if (!invoice) {
     return res.status(404).json({ success: false, message: 'Invoice not found' });
+  }
+
+  if (isEligibleInvoiceDate(invoice.date)) {
+    return res.status(409).json({
+      success: false,
+      code: 'INVOICE_ARCHIVE_REQUIRED',
+      message:
+        'Invoices older than the retention cutoff must be archived and verified before deletion',
+    });
   }
 
   await invoice.deleteOne();

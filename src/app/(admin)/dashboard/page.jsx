@@ -56,6 +56,7 @@ import {
   WorkerOrderCard,
 } from '@/components/worker/WorkerMobileCards';
 import WorkerInstallCard from '@/components/worker/WorkerInstallCard';
+import InvoiceArchiveAlert from '@/components/invoice/InvoiceArchiveAlert';
 
 function monthParams() {
   const now = new Date();
@@ -882,6 +883,7 @@ export default function DashboardPage() {
   const period = monthParams();
   const invoiceRead = hasPermission('invoice.read');
   const invoiceCreate = hasPermission('invoice.create');
+  const invoiceArchive = hasPermission('invoice.archive');
   const clientRead = hasPermission('client.read');
   const orderRead = hasPermission('production_order.read');
   const orderCreate = hasPermission('production_order.create');
@@ -974,6 +976,7 @@ export default function DashboardPage() {
         <span className="font-medium">{user?.username ?? user?.email}</span>
         {user?.role?.name && <Badge variant="secondary">{user.role.name}</Badge>}
       </div>
+      {invoiceArchive && <InvoiceArchiveAlert />}
       {invoiceRead && (
         <InvoicePanel query={invoices} clients={clients.data?.clients} canCreate={invoiceCreate} />
       )}
