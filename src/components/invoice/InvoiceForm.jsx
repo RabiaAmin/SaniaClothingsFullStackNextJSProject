@@ -27,10 +27,16 @@ const EMPTY_ITEM = () => ({
   unitPrice: '',
   originalDescription: '',
   snapshotUnitPrice: null,
+  // True only when the Item Code is confirmed absent from the CMT Price List.
+  manualPrice: false,
 });
 
 function todayISO() {
   return new Date().toISOString().split('T')[0];
+}
+
+function sameItemCode(first, second) {
+  return (first ?? '').trim().toUpperCase() === (second ?? '').trim().toUpperCase();
 }
 
 export default function InvoiceForm({
@@ -62,6 +68,7 @@ export default function InvoiceForm({
         unitPrice: i.unitPrice ?? '',
         originalDescription: i.description ?? '',
         snapshotUnitPrice: i.unitPrice ?? '',
+        manualPrice: false,
       }));
     }
     return [EMPTY_ITEM()];
@@ -95,48 +102,66 @@ export default function InvoiceForm({
       prev.map((it, i) => {
         if (i !== idx) return it;
         if (field !== 'description') return { ...it, [field]: value };
-        const returnsToSnapshot =
-          value.trim().toUpperCase() === it.originalDescription.trim().toUpperCase();
+        if (sameItemCode(value, it.description)) return { ...it, description: value };
+        // A different Item Code never inherits the previous line's price; the next lookup decides
+        // whether the price comes from the CMT Price List or is entered manually.
+        const returnsToSnapshot = sameItemCode(value, it.originalDescription);
         return {
           ...it,
           description: value,
           unitPrice: returnsToSnapshot ? it.snapshotUnitPrice : '',
+          manualPrice: false,
         };
       })
     );
-    if (field === 'description') {
+    if (field === 'description' && !sameItemCode(value, items[idx].description)) {
       setPriceStates((current) => ({ ...current, [idx]: null }));
     }
   }
 
-  async function findItemPrice(idx) {
-    const item = items[idx];
+  async function findItemPrice(idx, item = items[idx]) {
     const itemCode = item.description.trim();
     if (!itemCode) return;
-    if (
-      item.originalDescription &&
-      itemCode.toUpperCase() === item.originalDescription.trim().toUpperCase()
-    ) {
-      return;
-    }
+    // A saved line keeps its stored price; the lookup only decides whether it is editable.
+    const isSavedLine =
+      Boolean(item.originalDescription) && sameItemCode(itemCode, item.originalDescription);
+    // Ignore results for a line whose Item Code changed while the lookup was in flight.
+    const applyToLine = (update) =>
+      setItems((current) =>
+        current.map((entry, entryIndex) =>
+          entryIndex === idx && sameItemCode(entry.description, itemCode) ? update(entry) : entry
+        )
+      );
+
     setPriceStates((current) => ({ ...current, [idx]: { loading: true } }));
     try {
       const price = await priceLookup.mutateAsync({ itemCode, usage: 'invoice' });
-      setItems((current) =>
-        current.map((entry, entryIndex) =>
-          entryIndex === idx
-            ? { ...entry, description: price.itemCode, unitPrice: price.cmtPrice }
-            : entry
-        )
+      applyToLine((entry) =>
+        isSavedLine
+          ? { ...entry, manualPrice: false }
+          : { ...entry, description: price.itemCode, unitPrice: price.cmtPrice, manualPrice: false }
       );
       setPriceStates((current) => ({
         ...current,
-        [idx]: { success: true, style: price.style },
+        [idx]: isSavedLine ? null : { success: true, style: price.style },
       }));
     } catch (error) {
-      setPriceStates((current) => ({ ...current, [idx]: { error: error.message } }));
+      const notFound = error.code === 'CMT_PRICE_NOT_FOUND';
+      if (notFound) applyToLine((entry) => ({ ...entry, manualPrice: true }));
+      setPriceStates((current) => ({
+        ...current,
+        [idx]: notFound ? { notFound: true } : { error: error.message },
+      }));
     }
   }
+
+  // Saved lines on the edit page are classified once so unregistered ones can be corrected.
+  useEffect(() => {
+    items.forEach((item, idx) => {
+      if (item.originalDescription) findItemPrice(idx, item);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function addItem() {
     setItems((p) => [...p, EMPTY_ITEM()]);
@@ -158,7 +183,8 @@ export default function InvoiceForm({
       items: items.map((it) => ({
         description: it.description,
         quantity: Number(it.quantity),
-        unitPrice: Number(it.unitPrice),
+        // Blank stays null so the API rejects a missing manual price instead of saving zero.
+        unitPrice: it.unitPrice === '' || it.unitPrice === null ? null : Number(it.unitPrice),
         amount: (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
       })),
       subTotal,
@@ -305,8 +331,10 @@ export default function InvoiceForm({
                     min="0"
                     step="0.01"
                     placeholder="0.00"
-                    value={it.unitPrice}
-                    readOnly
+                    aria-label="Unit price"
+                    value={it.unitPrice ?? ''}
+                    onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
+                    readOnly={!it.manualPrice}
                     required
                   />
                   <div className="col-span-2 text-right text-sm font-medium tabular-nums">
@@ -327,6 +355,11 @@ export default function InvoiceForm({
                 {priceStates[idx]?.success && (
                   <p className="col-span-12 text-xs text-green-700">
                     {priceStates[idx].style} · CMT Price: {formatCurrency(it.unitPrice)}
+                  </p>
+                )}
+                {priceStates[idx]?.notFound && (
+                  <p className="col-span-12 text-xs text-amber-700">
+                    Item code not found in CMT Price List. Enter the unit price manually.
                   </p>
                 )}
                 {priceStates[idx]?.error && (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MoreHorizontal, Pencil, Plus, Tags, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Plus, Search, Tags, Trash2, Loader2, X } from 'lucide-react';
 import PageHeader from '@/components/admin/PageHeader';
 import StatusBadge from '@/components/admin/StatusBadge';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
@@ -171,7 +171,13 @@ export default function CmtPricesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [search, setSearch] = useState('');
   const entries = data?.cmtPrices ?? [];
+  // The API returns the complete, unpaginated price list, so filtering here covers every entry.
+  const searchTerm = search.trim().toUpperCase();
+  const displayed = searchTerm
+    ? entries.filter((entry) => entry.itemCode?.toUpperCase().includes(searchTerm))
+    : entries;
 
   function openDialog(entry = null) {
     setEditTarget(entry);
@@ -212,6 +218,31 @@ export default function CmtPricesPage() {
         }
       />
       <Card>
+        <CardContent className="flex items-center gap-2 p-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search by item code…"
+              aria-label="Search by item code"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          {search && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearch('')}
+              className="gap-1 text-muted-foreground"
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6">
@@ -233,6 +264,18 @@ export default function CmtPricesPage() {
               }
               className="m-6"
             />
+          ) : displayed.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="No matching item codes"
+              description={`No CMT prices have an Item Code containing "${search.trim()}".`}
+              action={
+                <Button variant="outline" onClick={() => setSearch('')}>
+                  <X className="h-4 w-4" /> Clear search
+                </Button>
+              }
+              className="m-6"
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -246,7 +289,7 @@ export default function CmtPricesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {entries.map((entry) => (
+                {displayed.map((entry) => (
                   <TableRow key={entry._id}>
                     <TableCell className="font-mono font-medium">{entry.itemCode}</TableCell>
                     <TableCell>{entry.style}</TableCell>

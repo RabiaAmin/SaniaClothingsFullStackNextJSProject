@@ -60,6 +60,23 @@ function validateInvoiceQuantity(value) {
   return quantity;
 }
 
+// Returns the active entry, or null when the Item Code is not registered. Inactive entries and
+// other lookup failures still throw, so registered codes can never be manually priced.
+async function findActivePriceOrNull(itemCode, options = {}) {
+  try {
+    return await getPriceByItemCode(itemCode, options);
+  } catch (error) {
+    if (error.code === 'CMT_PRICE_NOT_FOUND') return null;
+    throw error;
+  }
+}
+
+// Item Codes absent from the CMT Price List are invoiced at a validated, user-entered unit price.
+// Unregistered codes are never added to the price list.
+function parseManualUnitPrice(value, itemCode) {
+  return roundMoney(parsePrice(value, `Unit price for unregistered item code ${itemCode}`));
+}
+
 async function priceNewInvoiceItems(items, options = {}) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new CmtPriceError('At least one invoice item is required');
@@ -67,9 +84,11 @@ async function priceNewInvoiceItems(items, options = {}) {
   return Promise.all(
     items.map(async (item) => {
       const description = normalizeItemCode(item?.description);
-      const price = await getPriceByItemCode(description, options);
+      const price = await findActivePriceOrNull(description, options);
       const quantity = validateInvoiceQuantity(item?.quantity);
-      const unitPrice = Number(price.cmtPrice);
+      const unitPrice = price
+        ? Number(price.cmtPrice)
+        : parseManualUnitPrice(item?.unitPrice, description);
       return { description, quantity, unitPrice, amount: roundMoney(quantity * unitPrice) };
     })
   );
@@ -85,9 +104,20 @@ async function priceUpdatedInvoiceItems(existingItems, nextItems, options = {}) 
       if (!description) throw new CmtPriceError('Item code is required');
       const previous = existingItems?.[index];
       const unchangedCode = normalizeItemCode(previous?.description) === description;
-      const unitPrice = unchangedCode
-        ? Number(previous.unitPrice)
-        : Number((await getPriceByItemCode(description, options)).cmtPrice);
+      let unitPrice;
+      if (unchangedCode) {
+        // Registered codes (active or inactive) keep their stored snapshot; unregistered codes
+        // keep their manual price unless a corrected one is supplied.
+        const entry = await (options.model ?? CmtPrice).findOne({ itemCode: description });
+        unitPrice = entry
+          ? Number(previous.unitPrice)
+          : parseManualUnitPrice(item?.unitPrice ?? previous.unitPrice, description);
+      } else {
+        const price = await findActivePriceOrNull(description, options);
+        unitPrice = price
+          ? Number(price.cmtPrice)
+          : parseManualUnitPrice(item?.unitPrice, description);
+      }
       const quantity = validateInvoiceQuantity(item?.quantity);
       return { description, quantity, unitPrice, amount: roundMoney(quantity * unitPrice) };
     })

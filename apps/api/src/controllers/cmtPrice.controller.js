@@ -2,6 +2,7 @@ const CmtPrice = require('../models/cmtPrice.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { hasPermission } = require('../services/permission.service');
 const {
+  CmtPriceError,
   normalizeItemCode,
   parsePrice,
   getPriceByItemCode,
@@ -30,7 +31,16 @@ exports.lookupCmtPrice = asyncHandler(async (req, res) => {
       message: 'You do not have permission to look up this price',
     });
   }
-  const entry = await getPriceByItemCode(req.params.itemCode);
+  let entry;
+  try {
+    entry = await getPriceByItemCode(req.params.itemCode);
+  } catch (error) {
+    if (!(error instanceof CmtPriceError)) throw error;
+    // The code lets clients distinguish unregistered Item Codes from inactive ones.
+    return res
+      .status(error.statusCode)
+      .json({ success: false, message: error.message, code: error.code });
+  }
   const base = { itemCode: entry.itemCode, style: entry.style };
   const price =
     usage === 'invoice'

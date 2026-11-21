@@ -127,3 +127,29 @@ test('purpose-scoped lookup never returns both internal price types', async () =
     CmtPrice.findOne = original;
   }
 });
+
+test('lookup reports a machine-readable code for unregistered and inactive Item Codes', async () => {
+  const original = CmtPrice.findOne;
+  const user = { role: { permissions: [{ key: 'invoice.create' }] } };
+  try {
+    CmtPrice.findOne = async () => null;
+    const missing = await invoke(controller.lookupCmtPrice, {
+      params: { itemCode: 'nope' },
+      query: { usage: 'invoice' },
+      user,
+    });
+    assert.equal(missing.status, 400);
+    assert.equal(missing.body.code, 'CMT_PRICE_NOT_FOUND');
+
+    CmtPrice.findOne = async () => ({ itemCode: 'OLD1', isActive: false });
+    const inactive = await invoke(controller.lookupCmtPrice, {
+      params: { itemCode: 'old1' },
+      query: { usage: 'invoice' },
+      user,
+    });
+    assert.equal(inactive.status, 400);
+    assert.equal(inactive.body.code, 'CMT_PRICE_INACTIVE');
+  } finally {
+    CmtPrice.findOne = original;
+  }
+});

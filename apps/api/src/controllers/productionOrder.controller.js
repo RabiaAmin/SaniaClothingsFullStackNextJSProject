@@ -11,6 +11,7 @@ const {
   normalizePoNumber,
 } = require('../services/productionInvoice.service');
 const {
+  buildStatusPrioritySortPipeline,
   enrichProductionOrder,
   enrichProductionOrders,
 } = require('../services/productionProgress.service');
@@ -205,21 +206,27 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
     if (!mongoose.isValidObjectId(req.query.clientId)) {
       return res.status(400).json({ success: false, message: 'Invalid client identifier' });
     }
-    filter.client = req.query.clientId;
+    // Aggregation pipelines are not cast by Mongoose, so store the ObjectId explicitly.
+    filter.client = new mongoose.Types.ObjectId(req.query.clientId);
   }
   if (isWorkerScopedRequest(req)) {
     filter.$and = [...(filter.$and ?? []), { assignedWorkers: req.user._id }];
   }
 
-  let [productionOrders, totalRecords] = await Promise.all([
-    ProductionOrder.find(filter)
-      .populate(POPULATE_FIELDS)
-      .sort({ dueDate: 1, createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit),
+  const [sortedPage, totalRecords] = await Promise.all([
+    ProductionOrder.aggregate(
+      buildStatusPrioritySortPipeline({ filter, skip: (page - 1) * limit, limit })
+    ),
     ProductionOrder.countDocuments(filter),
   ]);
-  productionOrders = await enrichProductionOrders(productionOrders);
+  const pageIds = sortedPage.map((order) => order._id);
+  const pageOrders = await ProductionOrder.find({ _id: { $in: pageIds } }).populate(
+    POPULATE_FIELDS
+  );
+  const ordersById = new Map(pageOrders.map((order) => [String(order._id), order]));
+  let productionOrders = await enrichProductionOrders(
+    pageIds.map((id) => ordersById.get(String(id))).filter(Boolean)
+  );
 
   if (hasPermission(req.user, 'invoice.read') && productionOrders.length > 0) {
     const relationships = await findInvoiceRelationships(

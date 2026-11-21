@@ -102,8 +102,85 @@ async function enrichProductionOrder(order, now = new Date()) {
   return enrichedOrder;
 }
 
+// List order for calculated statuses; cancelled orders are not prioritized and sort last.
+const CALCULATED_STATUS_SORT_PRIORITY = {
+  NOT_STARTED: 1,
+  IN_PROGRESS: 2,
+  OVERDUE: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+};
+
+// buildProductionTracking marks an order OVERDUE when its production deadline (due date minus one
+// UTC day) is before today, which is equivalent to the due date falling before tomorrow (UTC).
+function getOverdueDueDateCutoff(now = new Date()) {
+  const cutoff = startOfUtcDay(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() + 1);
+  return cutoff;
+}
+
+// Mirrors buildProductionTracking's calculatedStatus inside MongoDB so the list can be sorted by
+// status priority and due date before pagination. Returns only the ordered page of `_id`s.
+function buildStatusPrioritySortPipeline({ filter = {}, skip = 0, limit = 20, now = new Date() }) {
+  const priority = CALCULATED_STATUS_SORT_PRIORITY;
+  const approvedQuantity = { $ifNull: [{ $arrayElemAt: ['$approvedTotals.quantity', 0] }, 0] };
+
+  return [
+    { $match: filter },
+    {
+      $lookup: {
+        from: ProductionEntry.collection.name,
+        let: { orderId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$productionOrder', '$$orderId'] }, status: 'APPROVED' } },
+          { $group: { _id: null, quantity: { $sum: '$quantity' } } },
+        ],
+        as: 'approvedTotals',
+      },
+    },
+    {
+      $addFields: {
+        statusPriority: {
+          $switch: {
+            branches: [
+              { case: { $eq: ['$status', 'CANCELLED'] }, then: priority.CANCELLED },
+              {
+                case: {
+                  $and: [
+                    { $gt: ['$orderedQuantity', 0] },
+                    { $gte: [approvedQuantity, '$orderedQuantity'] },
+                  ],
+                },
+                then: priority.COMPLETED,
+              },
+              {
+                case: {
+                  $and: [
+                    { $eq: [{ $type: '$dueDate' }, 'date'] },
+                    { $lt: ['$dueDate', getOverdueDueDateCutoff(now)] },
+                  ],
+                },
+                then: priority.OVERDUE,
+              },
+              { case: { $gt: [approvedQuantity, 0] }, then: priority.IN_PROGRESS },
+            ],
+            default: priority.NOT_STARTED,
+          },
+        },
+      },
+    },
+    { $sort: { statusPriority: 1, dueDate: 1, createdAt: -1, _id: -1 } },
+    { $skip: skip },
+    { $limit: limit },
+    { $project: { _id: 1 } },
+  ];
+}
+
 module.exports = {
+  CALCULATED_STATUS_SORT_PRIORITY,
   buildProductionTracking,
+  buildStatusPrioritySortPipeline,
+  getOverdueDueDateCutoff,
   enrichProductionOrder,
   enrichProductionOrders,
   getApprovedQuantities,

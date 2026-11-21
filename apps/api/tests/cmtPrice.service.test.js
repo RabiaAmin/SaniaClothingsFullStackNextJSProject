@@ -79,3 +79,88 @@ test('invoice totals retain the existing 15 percent VAT architecture', () => {
     totalAmount: 6100,
   });
 });
+
+test('unregistered Item Codes on new invoices use a validated manual unit price', async () => {
+  const model = priceModel({
+    JAWIR9E: { itemCode: 'JAWIR9E', cmtPrice: 55, isActive: true },
+    OLD1: { itemCode: 'OLD1', cmtPrice: 20, isActive: false },
+  });
+  const items = await priceNewInvoiceItems(
+    [
+      { description: 'jawir9e', quantity: 10, unitPrice: 999 },
+      { description: ' custom1 ', quantity: 3, unitPrice: '12,345' },
+    ],
+    { model }
+  );
+  assert.deepEqual(items, [
+    { description: 'JAWIR9E', quantity: 10, unitPrice: 55, amount: 550 },
+    { description: 'CUSTOM1', quantity: 3, unitPrice: 12.35, amount: 37.05 },
+  ]);
+  assert.deepEqual(calculateInvoiceTotals(items, 1), {
+    subTotal: 587.05,
+    tax: 88.06,
+    totalAmount: 675.11,
+  });
+
+  for (const unitPrice of [undefined, null, '', -1, 'abc']) {
+    await assert.rejects(
+      () => priceNewInvoiceItems([{ description: 'custom1', quantity: 1, unitPrice }], { model }),
+      /unregistered item code CUSTOM1/i
+    );
+  }
+  await assert.rejects(
+    () => priceNewInvoiceItems([{ description: 'old1', quantity: 1, unitPrice: 5 }], { model }),
+    /currently inactive/i
+  );
+});
+
+test('invoice edits let unregistered lines keep or correct their manual price', async () => {
+  const model = priceModel({
+    JAWIR9E: { itemCode: 'JAWIR9E', cmtPrice: 60, isActive: true },
+    OLD1: { itemCode: 'OLD1', cmtPrice: 20, isActive: false },
+  });
+  const existing = [
+    { description: 'CUSTOM1', quantity: 2, unitPrice: 15, amount: 30 },
+    { description: 'OLD1', quantity: 1, unitPrice: 18, amount: 18 },
+  ];
+
+  const corrected = await priceUpdatedInvoiceItems(
+    existing,
+    [
+      { description: 'custom1', quantity: 2, unitPrice: 17.5 },
+      { description: 'old1', quantity: 1, unitPrice: 999 },
+    ],
+    { model }
+  );
+  assert.equal(corrected[0].unitPrice, 17.5);
+  assert.equal(corrected[0].amount, 35);
+  assert.equal(corrected[1].unitPrice, 18, 'registered snapshot is preserved even when inactive');
+
+  const omitted = await priceUpdatedInvoiceItems(
+    existing,
+    [
+      { description: 'CUSTOM1', quantity: 4 },
+      { description: 'OLD1', quantity: 1 },
+    ],
+    { model }
+  );
+  assert.equal(omitted[0].unitPrice, 15, 'stored manual price is kept when none is supplied');
+
+  const switchedToRegistered = await priceUpdatedInvoiceItems(
+    existing,
+    [{ description: 'jawir9e', quantity: 2, unitPrice: 1 }],
+    { model }
+  );
+  assert.equal(switchedToRegistered[0].unitPrice, 60);
+
+  const switchedToUnregistered = await priceUpdatedInvoiceItems(
+    existing,
+    [{ description: 'custom2', quantity: 2, unitPrice: 8 }],
+    { model }
+  );
+  assert.equal(switchedToUnregistered[0].unitPrice, 8);
+  await assert.rejects(
+    () => priceUpdatedInvoiceItems(existing, [{ description: 'custom2', quantity: 2 }], { model }),
+    /unregistered item code CUSTOM2 is required/i
+  );
+});

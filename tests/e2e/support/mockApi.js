@@ -572,7 +572,11 @@ async function mockApi(page, options = {}) {
       if (!entry) {
         return response(
           route,
-          { success: false, message: 'Item code not found in CMT Price List.' },
+          {
+            success: false,
+            message: 'Item code not found in CMT Price List.',
+            code: 'CMT_PRICE_NOT_FOUND',
+          },
           400
         );
       }

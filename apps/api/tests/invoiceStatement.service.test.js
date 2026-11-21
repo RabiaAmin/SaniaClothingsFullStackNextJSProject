@@ -76,6 +76,15 @@ test('statement generation matches only selected database IDs and preserves grou
   const pipeline = fake.getPipeline();
   assert.deepEqual(pipeline[0].$match.status, 'Sent');
   assert.equal(pipeline[0].$match._id.$in.length, 2);
-  assert.deepEqual(pipeline[1], { $sort: { date: -1, _id: -1 } });
+  assert.deepEqual(pipeline[1].$addFields.invoiceNumberValue.$convert, {
+    input: { $trim: { input: '$invoiceNumber' } },
+    to: 'long',
+    onError: null,
+    onNull: null,
+  });
+  assert.deepEqual(pipeline[2], { $sort: { invoiceNumberValue: -1, invoiceNumber: -1, _id: -1 } });
+  assert.deepEqual(pipeline[3], { $project: { invoiceNumberValue: 0 } });
+  const groupIndex = pipeline.findIndex((stage) => stage.$group);
+  assert.ok(groupIndex > 2, 'invoices are sorted before they are pushed into client groups');
   assert.deepEqual(pipeline.at(-1), { $sort: { totalAmount: -1 } });
 });

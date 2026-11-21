@@ -48,7 +48,22 @@ async function generateInvoiceStatements(invoiceIds, invoiceModel = Invoice) {
 
   return invoiceModel.aggregate([
     { $match: { _id: { $in: ids }, status: 'Sent' } },
-    { $sort: { date: -1, _id: -1 } },
+    // Invoice numbers are numeric strings, so sort by their integer value (a string sort would
+    // place "99" above "863"). Non-numeric legacy numbers convert to null and sort last.
+    {
+      $addFields: {
+        invoiceNumberValue: {
+          $convert: {
+            input: { $trim: { input: '$invoiceNumber' } },
+            to: 'long',
+            onError: null,
+            onNull: null,
+          },
+        },
+      },
+    },
+    { $sort: { invoiceNumberValue: -1, invoiceNumber: -1, _id: -1 } },
+    { $project: { invoiceNumberValue: 0 } },
     {
       $lookup: {
         from: 'clients',
