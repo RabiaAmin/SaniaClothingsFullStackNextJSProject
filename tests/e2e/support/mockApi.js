@@ -481,10 +481,7 @@ async function mockApi(page, options = {}) {
     if (method === 'POST' && path === '/users') {
       const payload = await readPayload(route);
       const role = roles.find((item) => item._id === payload.roleId);
-      createdUserPassword =
-        role.slug === 'worker'
-          ? `${payload.username.toLowerCase().trim().replace(/\s/g, '')}123#`
-          : 'TempUserA1!secure';
+      createdUserPassword = `${payload.username.replace(/\s/g, '')}123#`;
       createdUser = {
         _id: 'user-created-worker',
         username: payload.username,
@@ -492,7 +489,7 @@ async function mockApi(page, options = {}) {
         phone: payload.phone,
         aboutMe: payload.aboutMe || 'Internal user account',
         isActive: true,
-        mustChangePassword: role.slug !== 'worker',
+        mustChangePassword: false,
         role: { _id: role._id, name: role.name, slug: role.slug },
         permissions: [
           'production_order.read',

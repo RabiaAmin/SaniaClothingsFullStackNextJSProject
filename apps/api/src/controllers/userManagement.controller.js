@@ -1,10 +1,7 @@
 const User = require('../models/user.model');
 const Role = require('../models/role.model');
 const asyncHandler = require('../utils/asyncHandler');
-const {
-  generateTemporaryPassword,
-  generateWorkerPassword,
-} = require('../services/password.service');
+const { generateInitialPassword } = require('../services/password.service');
 const { canGrantPermissions } = require('../services/permission.service');
 
 function serializeManagedUser(user) {
@@ -64,10 +61,11 @@ exports.createUser = asyncHandler(async (req, res) => {
     avatar: { public_id: '', url: '' },
     role: role._id,
     isActive: true,
-    mustChangePassword: role.slug !== 'worker',
+    // Admin-created accounts of every role can sign in with the generated password
+    // immediately; password changes remain available voluntarily.
+    mustChangePassword: false,
   });
-  const temporaryPassword =
-    role.slug === 'worker' ? generateWorkerPassword(user.username) : generateTemporaryPassword();
+  const temporaryPassword = generateInitialPassword(user.username);
   user.password = temporaryPassword;
   await user.save();
   await user.populate({ path: 'role', populate: { path: 'permissions' } });

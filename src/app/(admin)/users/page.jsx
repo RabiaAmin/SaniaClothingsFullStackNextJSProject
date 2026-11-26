@@ -160,7 +160,7 @@ function CredentialsDialog({ credentials, onClose }) {
   async function copyCredentials() {
     try {
       await navigator.clipboard.writeText(
-        `Email: ${credentials.email}\nTemporary password: ${credentials.temporaryPassword}`
+        `Email: ${credentials.email}\nPassword: ${credentials.temporaryPassword}`
       );
       setCopied(true);
       toast({ title: 'Credentials copied' });
@@ -173,14 +173,15 @@ function CredentialsDialog({ credentials, onClose }) {
     <Dialog open={Boolean(credentials)} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Temporary Login Credentials</DialogTitle>
+          <DialogTitle>Login Credentials</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
             <KeyRound className="mt-0.5 h-5 w-5 shrink-0" />
             <p className="text-sm">
-              Copy these details now. The temporary password will not be shown again after this
-              dialog is closed.
+              Copy these details now. The generated password will not be shown again after this
+              dialog is closed. The user can sign in with it immediately and change it later from
+              Password Manager.
             </p>
           </div>
           <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
@@ -193,7 +194,7 @@ function CredentialsDialog({ credentials, onClose }) {
               <p className="break-all font-mono text-sm">{credentials?.email}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Temporary password</p>
+              <p className="text-xs font-medium text-muted-foreground">Password</p>
               <p className="break-all font-mono text-sm">{credentials?.temporaryPassword}</p>
             </div>
           </div>

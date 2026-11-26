@@ -1,13 +1,11 @@
-const crypto = require('crypto');
-
 const MINIMUM_PASSWORD_LENGTH = 8;
 
-function generateTemporaryPassword() {
-  return `${crypto.randomBytes(12).toString('base64url')}A1!`;
-}
-
-function generateWorkerPassword(username) {
-  return `${username.replace(/\s/g, '')}123#`;
+// Initial password for every Admin-created account, regardless of role:
+// the username with all whitespace removed, followed by `123#`. The stored username is
+// not changed, the User pre-save hook stores only the bcrypt hash, and the account is
+// usable immediately; changing the password later is voluntary.
+function generateInitialPassword(username) {
+  return `${String(username).replace(/\s/g, '')}123#`;
 }
 
 function validatePermanentPassword(password) {
@@ -21,7 +19,6 @@ function validatePermanentPassword(password) {
 
 module.exports = {
   MINIMUM_PASSWORD_LENGTH,
-  generateTemporaryPassword,
-  generateWorkerPassword,
+  generateInitialPassword,
   validatePermanentPassword,
 };

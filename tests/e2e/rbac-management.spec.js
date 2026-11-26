@@ -106,6 +106,41 @@ test('Worker creation uses a simple password and opens the dashboard without for
   );
 });
 
+test('non-Worker roles receive the same <username>123# password and no forced change', async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto('/users');
+
+  await page.getByRole('button', { name: 'Create User' }).click();
+  const createDialog = page.getByRole('dialog');
+  await createDialog.getByLabel('Username').fill('billing-manager');
+  await createDialog.getByLabel('Email').fill('billing@sania.test');
+  await createDialog.getByLabel('Phone').fill('+27 82 555 0666');
+  await createDialog.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Invoice Manager', exact: true }).click();
+  await createDialog.getByRole('button', { name: 'Create User' }).click();
+
+  const credentialsDialog = page.getByRole('dialog');
+  await expect(credentialsDialog.getByRole('heading', { name: 'Login Credentials' })).toBeVisible();
+  await expect(credentialsDialog.getByText('billing-manager123#', { exact: true })).toBeVisible();
+  await credentialsDialog.getByRole('button', { name: 'Done' }).click();
+  await expect(
+    page
+      .getByRole('row')
+      .filter({ hasText: 'billing-manager' })
+      .getByText('Password setup required')
+  ).toHaveCount(0);
+
+  await page.goto('/login');
+  await page.getByLabel('Email address').fill('billing@sania.test');
+  await page.getByLabel('Password', { exact: true }).fill('billing-manager123#');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/password');
+  await expect(page).not.toHaveURL(/\/change-password/);
+});
+
 test('admin deletion requires confirmation and removes the user from the list', async ({
   page,
 }) => {
