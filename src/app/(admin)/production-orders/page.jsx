@@ -39,8 +39,9 @@ import { useClients } from '@/hooks/useClients';
 import { useAuth } from '@/hooks/useAuth';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
 import { WorkerCardSkeleton, WorkerOrderCard } from '@/components/worker/WorkerMobileCards';
+import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
+import { isProductionManagerView } from '@/lib/auth/productionViews';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import {
   PRODUCTION_ORDER_STATUSES,
@@ -149,12 +150,14 @@ export default function ProductionOrdersPage() {
     hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
   const isMobile = useMediaQuery('(max-width: 767px)');
   const showWorkerMobile = isWorkerView && isMobile;
-  const canRecordProduction = hasPermission('production_entry.create');
+  // Production Manager PWA: order cards with assignment and actions instead of the dense table.
+  const showManagerMobile = !isWorkerView && isMobile && isProductionManagerView(hasPermission);
+  const canUpdateOrders = hasPermission('production_order.update');
+  const [recordOrder, setRecordOrder] = useState(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [clientId, setClientId] = useState('all');
   const [page, setPage] = useState(1);
-  const [workOrder, setWorkOrder] = useState(null);
   const deferredSearch = useDeferredValue(search);
   const params = {
     page,
@@ -262,20 +265,13 @@ export default function ProductionOrdersPage() {
                   <h2 id="assigned-orders-heading" className="font-semibold">
                     My Assigned Orders
                   </h2>
-                  <p className="text-sm text-muted-foreground">Work specifically assigned to you</p>
                 </div>
                 {assignedOrders.length === 0 ? (
                   <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                     No production orders are assigned to you.
                   </p>
                 ) : (
-                  assignedOrders.map((order) => (
-                    <WorkerOrderCard
-                      key={order._id}
-                      order={order}
-                      onAddWork={canRecordProduction ? setWorkOrder : undefined}
-                    />
-                  ))
+                  assignedOrders.map((order) => <WorkerOrderCard key={order._id} order={order} />)
                 )}
               </section>
             </>
@@ -283,7 +279,57 @@ export default function ProductionOrdersPage() {
         </div>
       )}
 
-      {!showWorkerMobile && (
+      {showManagerMobile && (
+        <div className="space-y-3" aria-live="polite" data-testid="manager-order-cards">
+          {isLoading ? (
+            <WorkerCardSkeleton />
+          ) : error ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {error.message}
+            </p>
+          ) : orders.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No production orders found"
+              description="Adjust the current filters or create a production order."
+            />
+          ) : (
+            orders.map((order) => {
+              const tracking = productionOrderTracking(order);
+              const canRecordHere =
+                (order.assignedWorkers ?? []).length > 0 &&
+                tracking.remainingQuantity > 0 &&
+                !['COMPLETED', 'CANCELLED'].includes(order.status);
+              return (
+                <WorkerOrderCard
+                  key={order._id}
+                  order={order}
+                  showAssignment
+                  actions={
+                    canRecordHere ? (
+                      <Button
+                        className="h-11"
+                        aria-label={`Record production for ${order.poNumber}`}
+                        onClick={() => setRecordOrder(order)}
+                      >
+                        <Plus className="h-4 w-4" aria-hidden="true" /> Record
+                      </Button>
+                    ) : canUpdateOrders ? (
+                      <Button asChild variant="outline" className="h-11">
+                        <Link href={`/production-orders/${order._id}/edit`}>
+                          <Pencil className="h-4 w-4" aria-hidden="true" /> Edit
+                        </Link>
+                      </Button>
+                    ) : null
+                  }
+                />
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {!showWorkerMobile && !showManagerMobile && (
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
@@ -395,12 +441,13 @@ export default function ProductionOrdersPage() {
           </Button>
         </div>
       )}
-
-      <ProductionEntryFormDialog
-        open={Boolean(workOrder)}
-        onOpenChange={(nextOpen) => !nextOpen && setWorkOrder(null)}
-        initialProductionOrderId={workOrder?._id}
-      />
+      {showManagerMobile && (
+        <ProductionEntryFormDialog
+          open={Boolean(recordOrder)}
+          onOpenChange={(nextOpen) => !nextOpen && setRecordOrder(null)}
+          initialProductionOrderId={recordOrder?._id ?? ''}
+        />
+      )}
     </div>
   );
 }

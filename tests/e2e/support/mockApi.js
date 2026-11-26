@@ -561,7 +561,15 @@ async function mockApi(page, options = {}) {
     }
 
     if (method === 'GET' && path === '/cmt-prices') {
-      return response(route, { success: true, cmtPrices });
+      const extraCmtPrices = Array.from({ length: options.extraCmtPrices ?? 0 }, (_, index) => ({
+        _id: `cmt-bulk-${index + 1}`,
+        itemCode: `BULK${String(index + 1).padStart(4, '0')}`,
+        style: `Bulk Style ${index + 1}`,
+        cmtPrice: 20,
+        workerPrice: 10,
+        isActive: true,
+      }));
+      return response(route, { success: true, cmtPrices: [...cmtPrices, ...extraCmtPrices] });
     }
     if (method === 'GET' && path.startsWith('/cmt-prices/lookup/')) {
       const itemCode = decodeURIComponent(path.split('/').pop()).trim().toUpperCase();
@@ -615,6 +623,8 @@ async function mockApi(page, options = {}) {
           ...productionOrder,
           assignedWorkers,
           approvedQuantity: currentApprovedQuantity,
+          producedQuantity: currentApprovedQuantity,
+          remainingQuantity: productionOrder.orderedQuantity - currentApprovedQuantity,
           invoiceRelationship,
         },
         ...(options.includeLegacyProductionOrder
@@ -654,12 +664,42 @@ async function mockApi(page, options = {}) {
             ]
           : []),
       ];
+      // Mirrors the API's server-side search, recordable filter, and paging.
+      let listedOrders = [
+        ...productionOrders,
+        ...Array.from({ length: options.extraOpenOrders ?? 0 }, (_, index) => ({
+          ...productionOrder,
+          _id: `bulk-order-${index + 1}`,
+          poNumber: `PO-BULK-${String(index + 1).padStart(3, '0')}`,
+          assignedWorkers,
+          approvedQuantity: currentApprovedQuantity,
+          producedQuantity: currentApprovedQuantity,
+          remainingQuantity: productionOrder.orderedQuantity - currentApprovedQuantity,
+        })),
+      ];
+      if (url.searchParams.get('recordable') === 'true') {
+        listedOrders = listedOrders.filter(
+          (order) =>
+            !['COMPLETED', 'CANCELLED'].includes(order.status) &&
+            (order.assignedWorkers ?? []).length > 0
+        );
+      }
+      const search = url.searchParams.get('search')?.trim().toLowerCase();
+      if (search) {
+        listedOrders = listedOrders.filter((order) =>
+          [order.poNumber, order.itemCode, order.productionDescription].some((value) =>
+            value?.toLowerCase().includes(search)
+          )
+        );
+      }
+      const listLimit = Math.min(100, Number(url.searchParams.get('limit')) || 20);
+      const listPage = Math.max(1, Number(url.searchParams.get('page')) || 1);
       return response(route, {
         success: true,
-        productionOrders,
-        page: 1,
-        totalPages: 1,
-        totalRecords: productionOrders.length,
+        productionOrders: listedOrders.slice((listPage - 1) * listLimit, listPage * listLimit),
+        page: listPage,
+        totalPages: Math.max(1, Math.ceil(listedOrders.length / listLimit)),
+        totalRecords: listedOrders.length,
       });
     }
     if (method === 'POST' && path === '/production-orders') {
@@ -681,7 +721,13 @@ async function mockApi(page, options = {}) {
     if (method === 'GET' && path.startsWith('/production-orders/')) {
       return response(route, {
         success: true,
-        productionOrder: { ...productionOrder, assignedWorkers },
+        productionOrder: {
+          ...productionOrder,
+          assignedWorkers,
+          approvedQuantity: currentApprovedQuantity,
+          producedQuantity: currentApprovedQuantity,
+          remainingQuantity: productionOrder.orderedQuantity - currentApprovedQuantity,
+        },
         invoiceRelationship,
         matchingInvoices: relatedInvoices,
       });
@@ -736,32 +782,156 @@ async function mockApi(page, options = {}) {
       });
     }
     if (method === 'POST' && path === '/production-entries') {
+      // Mirrors the API: manager-recorded entries need create + approve, must target an
+      // assigned worker, fit the remaining quantity, and are approved immediately.
+      const canRecord = ['production_entry.create', 'production_entry.approve'].every(
+        (permission) =>
+          sessionUser.permissions?.includes('*') || sessionUser.permissions?.includes(permission)
+      );
+      if (!canRecord) {
+        return response(
+          route,
+          { success: false, message: 'You do not have permission to perform this action' },
+          403
+        );
+      }
       const payload = await readPayload(route);
+      const todayValue = new Date().toISOString().slice(0, 10);
+      if (payload.date > todayValue) {
+        return response(
+          route,
+          { success: false, message: 'Production date cannot be in the future' },
+          400
+        );
+      }
+      if (payload.date < productionOrder.startDate.slice(0, 10)) {
+        return response(
+          route,
+          { success: false, message: 'Production date cannot be before the order start date' },
+          400
+        );
+      }
+      const selectedWorker = assignedWorkers.find((item) => item._id === payload.workerId);
+      if (!selectedWorker) {
+        return response(
+          route,
+          {
+            success: false,
+            message: 'The selected worker is not assigned to this production order',
+          },
+          400
+        );
+      }
+      if (currentApprovedQuantity + payload.quantity > productionOrder.orderedQuantity) {
+        return response(
+          route,
+          { success: false, message: 'Quantity cannot exceed the remaining order quantity' },
+          409
+        );
+      }
+      currentApprovedQuantity += payload.quantity;
+      const recorder = {
+        _id: sessionUser._id,
+        username: sessionUser.username,
+        email: sessionUser.email,
+      };
       const entry = {
         _id: 'production-entry-created',
         productionOrder: { ...productionOrder },
-        worker: {
-          _id: sessionUser._id,
-          username: sessionUser.username,
-          email: sessionUser.email,
-        },
+        worker: selectedWorker,
         date: payload.date,
         quantity: payload.quantity,
         unitRate: productionOrder.workerRate,
         totalAmount: payload.quantity * productionOrder.workerRate,
         notes: payload.notes ?? '',
-        status: 'PENDING',
+        status: 'APPROVED',
+        recordedBy: recorder,
+        reviewedBy: recorder,
+        reviewedAt: new Date().toISOString(),
       };
       productionEntries.unshift(entry);
       return response(route, { success: true, productionEntry: entry }, 201);
     }
     if (method === 'PUT' && path.startsWith('/production-entries/')) {
+      const canUpdateAll =
+        sessionUser.permissions?.includes('*') ||
+        sessionUser.permissions?.includes('production_entry.update_all');
+      if (!canUpdateAll) {
+        return response(
+          route,
+          { success: false, message: 'You do not have permission to perform this action' },
+          403
+        );
+      }
       const entry = productionEntries.find((item) => path.endsWith(item._id));
       const payload = await readPayload(route);
       Object.assign(entry, payload, {
         totalAmount: (payload.quantity ?? entry.quantity) * entry.unitRate,
       });
       return response(route, { success: true, productionEntry: entry });
+    }
+    if (
+      method === 'PATCH' &&
+      path.startsWith('/production-entries/') &&
+      path.endsWith('/reverse')
+    ) {
+      const canReverse = ['production_entry.create', 'production_entry.approve'].every(
+        (permission) =>
+          sessionUser.permissions?.includes('*') || sessionUser.permissions?.includes(permission)
+      );
+      if (!canReverse) {
+        return response(
+          route,
+          { success: false, message: 'You do not have permission to perform this action' },
+          403
+        );
+      }
+      const payload = await readPayload(route);
+      if (!payload.reason?.trim()) {
+        return response(
+          route,
+          { success: false, message: 'A reason is required to reverse a production entry' },
+          400
+        );
+      }
+      const entry = productionEntries.find((item) => item._id === path.split('/')[2]);
+      if (entry.reversedAt || entry.entryType === 'REVERSAL' || entry.status !== 'APPROVED') {
+        return response(
+          route,
+          { success: false, message: 'This production entry has already been reversed' },
+          409
+        );
+      }
+      const reverser = {
+        _id: sessionUser._id,
+        username: sessionUser.username,
+        email: sessionUser.email,
+      };
+      currentApprovedQuantity -= entry.quantity;
+      Object.assign(entry, {
+        reversedAt: new Date().toISOString(),
+        reversedBy: reverser,
+        reversalReason: payload.reason.trim(),
+      });
+      const reversalEntry = {
+        ...entry,
+        _id: `${entry._id}-reversal`,
+        date: `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
+        quantity: -entry.quantity,
+        totalAmount: -entry.totalAmount,
+        notes: `Reversal: ${payload.reason.trim()}`,
+        entryType: 'REVERSAL',
+        reversalOf: { _id: entry._id, date: entry.date, quantity: entry.quantity },
+        reversedAt: null,
+        reversedBy: null,
+        reversalReason: '',
+        recordedBy: reverser,
+        reviewedBy: reverser,
+        reviewNotes: '',
+      };
+      entry.reversalEntry = reversalEntry._id;
+      productionEntries.unshift(reversalEntry);
+      return response(route, { success: true, productionEntry: entry, reversalEntry });
     }
     if (
       method === 'PATCH' &&
@@ -893,7 +1063,13 @@ async function mockApi(page, options = {}) {
     }
 
     if (method === 'GET' && path === '/client/getAll') {
-      return response(route, { success: true, clients });
+      const extraClients = Array.from({ length: options.extraClients ?? 0 }, (_, index) => ({
+        _id: `client-bulk-${index + 1}`,
+        name: `Bulk Client ${String(index + 1).padStart(4, '0')}`,
+        email: `bulk${index + 1}@client.test`,
+        vatApplicable: false,
+      }));
+      return response(route, { success: true, clients: [...clients, ...extraClients] });
     }
     if (method === 'GET' && path.startsWith('/client/get/')) {
       return response(route, { success: true, client: clients[0] });

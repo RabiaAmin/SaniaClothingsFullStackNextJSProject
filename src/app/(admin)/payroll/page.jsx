@@ -290,7 +290,14 @@ function PayrollPageContent() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-mono font-bold">{entry.poNumber}</p>
+                          <p className="font-mono font-bold">
+                            {entry.poNumber}
+                            {entry.entryType === 'REVERSAL' && (
+                              <span className="ml-1 font-sans text-xs font-normal text-muted-foreground">
+                                (reversal)
+                              </span>
+                            )}
+                          </p>
                           <p className="mt-1 line-clamp-2 text-sm font-medium">
                             {entry.product?.name ??
                               entry.productionDescription ??
@@ -349,7 +356,14 @@ function PayrollPageContent() {
                         {canReadAll && (
                           <TableCell>{entry.worker.username ?? entry.worker.email}</TableCell>
                         )}
-                        <TableCell className="font-mono font-semibold">{entry.poNumber}</TableCell>
+                        <TableCell className="font-mono font-semibold">
+                          {entry.poNumber}
+                          {entry.entryType === 'REVERSAL' && (
+                            <span className="ml-1 font-sans text-xs font-normal text-muted-foreground">
+                              (reversal)
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <p className="font-medium">
                             {entry.product?.name ?? 'Custom production'}

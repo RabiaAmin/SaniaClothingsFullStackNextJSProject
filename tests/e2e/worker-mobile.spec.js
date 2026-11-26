@@ -31,9 +31,10 @@ test('worker mobile dashboard and navigation prioritize daily work', async ({ pa
   await expect(navigation).toBeVisible();
   await expect(navigation.getByRole('link', { name: 'Home' })).toBeVisible();
   await expect(navigation.getByRole('link', { name: 'My Work' })).toBeVisible();
-  await expect(navigation.getByRole('link', { name: 'Add Work' })).toBeVisible();
   await expect(navigation.getByRole('link', { name: 'Earnings' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Record Production' })).toBeVisible();
+  // Production is recorded by managers, so workers get no submission entry points.
+  await expect(navigation.getByRole('link', { name: 'Add Work' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Record Production' })).toHaveCount(0);
   await expect(page.getByText('My Assigned Orders')).toBeVisible();
   await expect(page.getByTestId('worker-order-card-production-order-1')).toBeVisible({
     timeout: 20_000,
@@ -49,33 +50,22 @@ test('worker mobile dashboard and navigation prioritize daily work', async ({ pa
   await expect(page.locator('table:visible')).toHaveCount(0);
 });
 
-test('worker records production from a preselected mobile order card', async ({ page }) => {
+test('worker mobile order cards are read-only and open order details', async ({ page }) => {
   const calls = await mockApi(page, { user: workerUser, assignedWorkerIds: ['user-worker'] });
   await page.goto('/production-orders');
 
   const orderCard = page.getByTestId('worker-order-card-production-order-1');
-  await orderCard.getByRole('button', { name: 'Add Work' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('combobox').first()).toContainText(
-    'PO-2026-001 - Navy work jackets for winter delivery'
-  );
-  await page.getByLabel('Production date *').fill('2026-08-23');
-  await page.getByLabel('Pieces produced *').fill('20');
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await expect(orderCard).toBeVisible({ timeout: 20_000 });
+  await expect(orderCard.getByText('40 remaining')).toBeVisible();
+  await expect(orderCard.getByRole('button', { name: 'Add Work' })).toHaveCount(0);
 
-  await expect
-    .poll(() => calls.find((call) => call.method === 'POST' && call.path === '/production-entries'))
-    .toEqual(
-      expect.objectContaining({
-        payload: {
-          productionOrderId: 'production-order-1',
-          date: '2026-08-23',
-          quantity: 20,
-          notes: '',
-        },
-      })
-    );
-  await expect(page).toHaveURL(/\/production-entries$/, { timeout: 30_000 });
+  await orderCard.getByRole('link', { name: 'View details' }).click();
+  await expect(page).toHaveURL(/\/production-orders\/production-order-1$/, { timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'PO-2026-001' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Add Work|Record Production/ })).toHaveCount(0);
+  expect(calls.some((call) => call.method === 'POST' && call.path === '/production-entries')).toBe(
+    false
+  );
 });
 
 test('worker mobile history uses cards with accessible statuses and account access', async ({

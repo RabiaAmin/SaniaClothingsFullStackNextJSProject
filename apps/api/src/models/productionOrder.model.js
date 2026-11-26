@@ -143,10 +143,13 @@ productionOrderSchema.statics.addApprovedQuantity = function addApprovedQuantity
   );
 };
 
+// Decrements approved progress (write compensation and production reversals). A cancelled
+// order stays CANCELLED; any other order returns to IN_PROGRESS, or PENDING at zero.
 productionOrderSchema.statics.removeApprovedQuantity = function removeApprovedQuantity(
   orderId,
   quantity,
-  updatedBy
+  updatedBy,
+  options = {}
 ) {
   if (!Number.isInteger(quantity) || quantity <= 0) {
     throw new Error('Approved quantity decrement must be a positive whole number');
@@ -166,12 +169,16 @@ productionOrderSchema.statics.removeApprovedQuantity = function removeApprovedQu
           updatedBy,
           updatedAt: new Date(),
           status: {
-            $cond: [{ $eq: [nextApprovedQuantity, 0] }, 'PENDING', 'IN_PROGRESS'],
+            $cond: [
+              { $eq: ['$status', 'CANCELLED'] },
+              'CANCELLED',
+              { $cond: [{ $eq: [nextApprovedQuantity, 0] }, 'PENDING', 'IN_PROGRESS'] },
+            ],
           },
         },
       },
     ],
-    { new: true }
+    { new: true, session: options.session }
   );
 };
 

@@ -5,7 +5,7 @@ import AuthGuard from '@/components/auth/AuthGuard';
 import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 import PermissionRouteGuard from '@/components/auth/PermissionRouteGuard';
-import WorkerMobileNavigation from '@/components/worker/WorkerMobileNavigation';
+import MobileBottomNavigation from '@/components/layout/MobileBottomNavigation';
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,7 +30,7 @@ export default function AdminLayout({ children }) {
             <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
               <PermissionRouteGuard>{children}</PermissionRouteGuard>
             </div>
-            <WorkerMobileNavigation />
+            <MobileBottomNavigation />
           </main>
         </div>
       </div>

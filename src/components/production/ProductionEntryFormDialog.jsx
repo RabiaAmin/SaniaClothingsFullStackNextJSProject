@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,66 +21,155 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useProductionOrders } from '@/hooks/useProductionOrders';
+import { useProductionOrder, useProductionOrders } from '@/hooks/useProductionOrders';
 import { useCreateProductionEntry, useUpdateProductionEntry } from '@/hooks/useProductionEntries';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/useToast';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { localDateInputValue, storedDateInputValue } from '@/lib/productionEntries';
+import { productionOrderTracking } from '@/lib/productionOrders';
+import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const ORDER_PAGE_SIZE = 20;
 
+function workerLabel(worker) {
+  return worker?.username ?? worker?.email ?? 'Unnamed worker';
+}
+
+function orderLabel(order) {
+  return `${order.poNumber} - ${order.productionDescription || order.itemCode || 'Production item'}`;
+}
+
+// Admin/Production Manager form: records pieces they physically counted for an assigned
+// worker. Recorded entries are approved immediately. Orders are found with server-side search
+// and paging over open orders that have assigned workers, so no order is out of reach. Edit
+// mode is kept only for correcting historical PENDING entries before review.
 export default function ProductionEntryFormDialog({
   open,
   onOpenChange,
   entry = null,
   initialProductionOrderId = '',
+  initialWorkerId = '',
+  initialDate = '',
 }) {
-  const router = useRouter();
-  const { user, hasPermission } = useAuth();
-  const isWorkerView =
-    hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
+  const { user } = useAuth();
   const isEditing = Boolean(entry);
-  const [productionOrderId, setProductionOrderId] = useState('');
-  const [date, setDate] = useState(today());
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderPage, setOrderPage] = useState(1);
+  const [workerId, setWorkerId] = useState('');
+  const [date, setDate] = useState(localDateInputValue());
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
-  const { data: orderData, isLoading: ordersLoading } = useProductionOrders({ limit: 100 });
+  const deferredSearch = useDeferredValue(orderSearch.trim());
+  const { data: orderData, isFetching: ordersLoading } = useProductionOrders(
+    {
+      recordable: true,
+      page: orderPage,
+      limit: ORDER_PAGE_SIZE,
+      ...(deferredSearch && { search: deferredSearch }),
+    },
+    { enabled: open && !isEditing }
+  );
+  const { data: initialOrderData } = useProductionOrder(
+    open && !isEditing && initialProductionOrderId ? initialProductionOrderId : null
+  );
   const createEntry = useCreateProductionEntry();
   const updateEntry = useUpdateProductionEntry();
   const mutation = isEditing ? updateEntry : createEntry;
-  const orders = useMemo(() => orderData?.productionOrders ?? [], [orderData?.productionOrders]);
-  const availableOrders = useMemo(
+  const orderResults = useMemo(
+    () => orderData?.productionOrders ?? [],
+    [orderData?.productionOrders]
+  );
+  const totalPages = orderData?.totalPages ?? 1;
+  const totalRecords = orderData?.totalRecords ?? 0;
+  const activeOrder = isEditing ? entry?.productionOrder : selectedOrder;
+  // Keep the chosen order selectable even when it is not on the current search page.
+  const selectableOrders = useMemo(
     () =>
-      orders.filter((order) => {
-        if (['COMPLETED', 'CANCELLED'].includes(order.status)) return false;
-        const assignedWorkerIds = (order.assignedWorkers ?? []).map((worker) =>
-          String(worker?._id ?? worker)
-        );
-        if (isWorkerView) return assignedWorkerIds.includes(String(user?._id));
-        return assignedWorkerIds.length === 0 || assignedWorkerIds.includes(String(user?._id));
-      }),
-    [isWorkerView, orders, user?._id]
+      selectedOrder && !orderResults.some((order) => order._id === selectedOrder._id)
+        ? [selectedOrder, ...orderResults]
+        : orderResults,
+    [orderResults, selectedOrder]
   );
-  const selectedOrder = useMemo(
-    () => orders.find((order) => order._id === productionOrderId) ?? entry?.productionOrder,
-    [entry?.productionOrder, orders, productionOrderId]
+  // Only active workers assigned to the selected order, excluding the recorder (no self-approval).
+  const assignedWorkers = useMemo(
+    () =>
+      (selectedOrder?.assignedWorkers ?? []).filter(
+        (worker) =>
+          worker?._id && worker.isActive !== false && String(worker._id) !== String(user?._id)
+      ),
+    [selectedOrder?.assignedWorkers, user?._id]
   );
+  const remainingQuantity = selectedOrder
+    ? productionOrderTracking(selectedOrder).remainingQuantity
+    : 0;
+  const minDate = storedDateInputValue(activeOrder?.startDate) || undefined;
+  const maxDate = localDateInputValue();
+  const dueDate = storedDateInputValue(activeOrder?.dueDate);
+  const isAfterDueDate = Boolean(date && dueDate && date > dueDate);
 
   useEffect(() => {
     if (!open) return;
-    setProductionOrderId(entry?.productionOrder?._id ?? initialProductionOrderId);
-    setDate(entry?.date?.slice(0, 10) ?? today());
+    setSelectedOrder(null);
+    setOrderSearch('');
+    setOrderPage(1);
+    setWorkerId(initialWorkerId || '');
+    setDate(entry?.date ? storedDateInputValue(entry.date) : initialDate || localDateInputValue());
     setQuantity(entry?.quantity?.toString() ?? '');
     setNotes(entry?.notes ?? '');
-  }, [entry, initialProductionOrderId, open]);
+  }, [entry, initialDate, initialWorkerId, open]);
+
+  // Preselect the order passed in (order detail page or a correction after reversal).
+  useEffect(() => {
+    const initialOrder = initialOrderData?.productionOrder;
+    if (open && initialOrder && !selectedOrder) setSelectedOrder(initialOrder);
+  }, [initialOrderData?.productionOrder, open, selectedOrder]);
+
+  // Preselect the only assigned worker; clear a worker who is not assigned to the chosen order.
+  useEffect(() => {
+    if (isEditing || !selectedOrder) return;
+    if (assignedWorkers.length === 1) {
+      setWorkerId(String(assignedWorkers[0]._id));
+    } else if (!assignedWorkers.some((worker) => String(worker._id) === workerId)) {
+      setWorkerId('');
+    }
+  }, [assignedWorkers, isEditing, selectedOrder, workerId]);
+
+  function handleOrderChange(orderId) {
+    const order = selectableOrders.find((item) => item._id === orderId);
+    if (order) setSelectedOrder(order);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
     const parsedQuantity = Number(quantity);
-    if (!productionOrderId || !date || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+    if (
+      (!isEditing && (!selectedOrder || !workerId)) ||
+      !date ||
+      !Number.isInteger(parsedQuantity) ||
+      parsedQuantity <= 0
+    ) {
       toast({
         title: 'Complete the required fields',
-        description: 'Select an order and enter a positive whole quantity.',
+        description: isEditing
+          ? 'Enter a valid date and a positive whole quantity.'
+          : 'Select an order and worker, then enter the verified whole quantity.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (date > maxDate || (minDate && date < minDate)) {
+      toast({
+        title: 'Choose a valid production date',
+        description: `Production dates must be between the order start date${minDate ? ` (${formatDate(minDate)})` : ''} and today.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!isEditing && parsedQuantity > remainingQuantity) {
+      toast({
+        title: 'Quantity exceeds the remaining order quantity',
+        description: `Only ${remainingQuantity} pieces remain on this order.`,
         variant: 'destructive',
       });
       return;
@@ -96,17 +184,17 @@ export default function ProductionEntryFormDialog({
         toast({ title: 'Production entry updated' });
       } else {
         await createEntry.mutateAsync({
-          productionOrderId,
+          productionOrderId: selectedOrder._id,
+          workerId,
           date,
           quantity: parsedQuantity,
           notes,
         });
         toast({
-          title: 'Production entry submitted',
-          description: 'It will count toward production after approval.',
+          title: 'Production recorded',
+          description: 'The entry is approved and counts toward progress and earnings.',
         });
       }
-      if (isWorkerView && !isEditing) router.push('/production-entries');
       onOpenChange(false);
     } catch (requestError) {
       toast({
@@ -116,29 +204,42 @@ export default function ProductionEntryFormDialog({
     }
   }
 
-  const amount = selectedOrder
-    ? (Number(quantity) || 0) * Number(selectedOrder.workerRate ?? entry?.unitRate ?? 0)
+  const amount = activeOrder
+    ? (Number(quantity) || 0) * Number(entry?.unitRate ?? activeOrder.workerRate ?? 0)
     : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={
-          isWorkerView
-            ? 'max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg'
-            : ''
-        }
-      >
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit production entry' : 'Record production'}</DialogTitle>
           <DialogDescription>
             {isEditing
               ? 'Pending entries can be corrected before review.'
-              : 'Submit the pieces you produced. Earnings are counted only after approval.'}
+              : 'Record the pieces you counted and verified for an assigned worker. The entry is approved immediately.'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="entryOrderSearch">Find order</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="entryOrderSearch"
+                  value={orderSearch}
+                  onChange={(event) => {
+                    setOrderSearch(event.target.value);
+                    setOrderPage(1);
+                  }}
+                  className="pl-9"
+                  placeholder="Search PO number, item code, or description"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="entryProductionOrder">Production order *</Label>
             {isEditing ? (
@@ -148,18 +249,23 @@ export default function ProductionEntryFormDialog({
                 disabled
               />
             ) : (
-              <Select value={productionOrderId} onValueChange={setProductionOrderId}>
-                <SelectTrigger id="entryProductionOrder" className={isWorkerView ? 'h-11' : ''}>
+              <Select value={selectedOrder?._id ?? ''} onValueChange={handleOrderChange}>
+                <SelectTrigger id="entryProductionOrder">
                   <SelectValue
                     placeholder={ordersLoading ? 'Loading orders...' : 'Select an order'}
                   >
-                    {selectedOrder
-                      ? `${selectedOrder.poNumber} - ${selectedOrder.productionDescription || selectedOrder.itemCode || 'Production item'}`
-                      : undefined}
+                    {selectedOrder ? orderLabel(selectedOrder) : undefined}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {availableOrders.map((order) => (
+                  {selectableOrders.length === 0 && !ordersLoading && (
+                    <p className="px-3 py-2 text-sm text-muted-foreground">
+                      {deferredSearch
+                        ? 'No open orders with assigned workers match this search'
+                        : 'No open orders with assigned workers'}
+                    </p>
+                  )}
+                  {selectableOrders.map((order) => (
                     <SelectItem key={order._id} value={order._id} className="py-2.5">
                       <span className="flex flex-col pr-3 text-left">
                         <span className="font-mono font-semibold">{order.poNumber}</span>
@@ -167,7 +273,8 @@ export default function ProductionEntryFormDialog({
                           {order.productionDescription || order.product?.name || 'Production item'}
                         </span>
                         <span className="font-mono text-xs text-muted-foreground">
-                          Item code: {order.itemCode || 'Unavailable'}
+                          Item code: {order.itemCode || 'Unavailable'} ·{' '}
+                          {productionOrderTracking(order).remainingQuantity} remaining
                         </span>
                       </span>
                     </SelectItem>
@@ -175,16 +282,86 @@ export default function ProductionEntryFormDialog({
                 </SelectContent>
               </Select>
             )}
+            {!isEditing && totalRecords > 0 && (
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>
+                  {totalRecords} matching open order{totalRecords === 1 ? '' : 's'}
+                  {totalPages > 1 ? ` · page ${orderPage} of ${totalPages}` : ''}
+                </span>
+                {totalPages > 1 && (
+                  <span className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={orderPage <= 1}
+                      onClick={() => setOrderPage((page) => page - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={orderPage >= totalPages}
+                      onClick={() => setOrderPage((page) => page + 1)}
+                    >
+                      Next
+                    </Button>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          {selectedOrder && (
-            <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+          <div className="space-y-2">
+            <Label htmlFor="entryWorker">Worker *</Label>
+            {isEditing ? (
+              <Input id="entryWorker" value={workerLabel(entry.worker)} disabled />
+            ) : (
+              <Select
+                value={workerId}
+                onValueChange={setWorkerId}
+                disabled={!selectedOrder || assignedWorkers.length === 0}
+              >
+                <SelectTrigger id="entryWorker">
+                  <SelectValue
+                    placeholder={
+                      !selectedOrder
+                        ? 'Select an order first'
+                        : assignedWorkers.length === 0
+                          ? 'No eligible assigned workers'
+                          : 'Select an assigned worker'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignedWorkers.map((worker) => (
+                    <SelectItem key={worker._id} value={String(worker._id)}>
+                      {workerLabel(worker)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {activeOrder && (
+            <div className="grid grid-cols-3 gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
               <div>
                 <p className="text-xs text-muted-foreground">Rate snapshot</p>
                 <p className="font-medium">
-                  {formatCurrency(entry?.unitRate ?? selectedOrder.workerRate)} per piece
+                  {formatCurrency(entry?.unitRate ?? activeOrder.workerRate)}
                 </p>
               </div>
+              {!isEditing && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                  <p className="font-medium tabular-nums">{remainingQuantity} pieces</p>
+                </div>
+              )}
               <div>
                 <p className="text-xs text-muted-foreground">Entry amount</p>
                 <p className="font-medium tabular-nums">{formatCurrency(amount)}</p>
@@ -199,13 +376,19 @@ export default function ProductionEntryFormDialog({
                 id="entryDate"
                 type="date"
                 value={date}
+                min={minDate}
+                max={maxDate}
                 onChange={(event) => setDate(event.target.value)}
                 required
-                className={isWorkerView ? 'h-11' : ''}
               />
+              <p className="text-xs text-muted-foreground">
+                {minDate
+                  ? `From the order start date (${formatDate(minDate)}) to today.`
+                  : 'Cannot be in the future.'}
+              </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="entryQuantity">Pieces produced *</Label>
+              <Label htmlFor="entryQuantity">Verified quantity *</Label>
               <Input
                 id="entryQuantity"
                 type="number"
@@ -214,10 +397,20 @@ export default function ProductionEntryFormDialog({
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}
                 required
-                className={isWorkerView ? 'h-14 text-lg font-semibold' : ''}
               />
             </div>
           </div>
+
+          {isAfterDueDate && (
+            <p
+              role="status"
+              className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              This date is after the order due date ({formatDate(dueDate)}). Late production on an
+              overdue order is allowed.
+            </p>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="entryNotes">Notes</Label>
@@ -230,22 +423,13 @@ export default function ProductionEntryFormDialog({
             />
           </div>
 
-          <DialogFooter className={isWorkerView ? 'gap-2' : ''}>
-            <Button
-              type="button"
-              variant="outline"
-              className={isWorkerView ? 'h-11 w-full sm:w-auto' : ''}
-              onClick={() => onOpenChange(false)}
-            >
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              className={isWorkerView ? 'h-11 w-full sm:w-auto' : ''}
-              disabled={mutation.isPending}
-            >
+            <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isEditing ? 'Save changes' : 'Submit for review'}
+              {isEditing ? 'Save changes' : 'Record and approve'}
             </Button>
           </DialogFooter>
         </form>

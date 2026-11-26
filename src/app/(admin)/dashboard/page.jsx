@@ -1,6 +1,5 @@
 'use client';
-
-import { useState } from 'react';
+import { usePwaInstall } from '@/components/common/PwaRegistrar';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -41,7 +40,11 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useProductionEntries } from '@/hooks/useProductionEntries';
 import { useProductionOrders } from '@/hooks/useProductionOrders';
 import { notificationTarget, notificationTypeLabel } from '@/lib/notifications';
-import { productionEntryStatusLabel, productionEntryStatusVariant } from '@/lib/productionEntries';
+import {
+  canRecordProduction,
+  productionEntryStatusLabel,
+  productionEntryStatusVariant,
+} from '@/lib/productionEntries';
 import {
   productionOrderProgressColor,
   productionOrderStatusLabel,
@@ -49,13 +52,13 @@ import {
   productionOrderTracking,
 } from '@/lib/productionOrders';
 import { formatCurrency, formatDate, formatRelativeTime } from '@/lib/utils/formatters';
-import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
 import {
   WorkerCardSkeleton,
   WorkerEntryCard,
   WorkerOrderCard,
 } from '@/components/worker/WorkerMobileCards';
 import WorkerInstallCard from '@/components/worker/WorkerInstallCard';
+import { isProductionManagerView } from '@/lib/auth/productionViews';
 import InvoiceArchiveAlert from '@/components/invoice/InvoiceArchiveAlert';
 
 function monthParams() {
@@ -522,7 +525,7 @@ function WorkerOrdersCard({ title, orders, isLoading, emptyMessage }) {
 }
 
 function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQuery, userId }) {
-  const [workOrder, setWorkOrder] = useState(null);
+    const { isInstalled} = usePwaInstall();
   const showWorkerMobile = useMediaQuery('(max-width: 767px)');
   const entries = entriesQuery.data?.productionEntries ?? [];
   const stats = entriesQuery.data?.stats ?? {};
@@ -543,20 +546,12 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
   );
 
   return (
-    <div data-testid="worker-dashboard" className="space-y-5">
-      <WorkerInstallCard />
+    <div data-testid="worker-dashboard" className="space-y-5 ">
+     {isInstalled && <WorkerInstallCard />}
       {showWorkerMobile && (
         <section className="space-y-5">
-          <div className="space-y-3">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">My production</h1>
-              <p className="text-sm text-muted-foreground">Your work, progress, and entry status</p>
-            </div>
-            <Button asChild className="h-12 w-full text-base">
-              <Link href="/production-entries?record=true">
-                <Plus className="h-5 w-5" /> Record Production
-              </Link>
-            </Button>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">My Jobs</h1>
           </div>
 
           <ErrorMessage queries={[entriesQuery, ordersQuery, payrollQuery, notificationsQuery]} />
@@ -565,16 +560,16 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
             <Card>
               <CardContent className="p-3">
                 <ClipboardList className="h-4 w-4 text-primary" aria-hidden="true" />
-                <p className="mt-2 text-xl font-bold tabular-nums">
+                <p className="mt-2 font-bold tabular-nums">
                   {ordersQuery.isLoading ? '—' : orders.length}
                 </p>
-                <p className="text-[11px] text-muted-foreground">Active orders</p>
+                <p className="text-[11px] text-muted-foreground">Active JOB</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-3">
                 <Shirt className="h-4 w-4 text-primary" aria-hidden="true" />
-                <p className="mt-2 text-xl font-bold tabular-nums">
+                <p className="mt-2  font-bold tabular-nums">
                   {entriesQuery.isLoading ? '—' : (stats.submittedQuantity ?? 0)}
                 </p>
                 <p className="text-[11px] text-muted-foreground">Monthly pieces</p>
@@ -582,17 +577,17 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
             </Card>
             <Card>
               <CardContent className="p-3">
-                <Clock3 className="h-4 w-4 text-amber-600" aria-hidden="true" />
-                <p className="mt-2 text-xl font-bold tabular-nums">
-                  {entriesQuery.isLoading ? '—' : (stats.pendingEntries ?? 0)}
+                   <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                <p className="mt-2   font-bold tabular-nums">
+                   {payrollQuery.isLoading ? '—' : formatCurrency(approvedEarnings)}
                 </p>
-                <p className="text-[11px] text-muted-foreground">Pending</p>
+                <p className="text-[11px] text-muted-foreground">Approved earnings</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-3">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                <p className="mt-2 text-xl font-bold tabular-nums">
+                <p className="mt-2 font-bold tabular-nums">
                   {entriesQuery.isLoading ? '—' : (stats.approvedQuantity ?? 0)}
                 </p>
                 <p className="text-[11px] text-muted-foreground">Approved pieces</p>
@@ -600,22 +595,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
             </Card>
           </div>
 
-          <Card>
-            <CardContent className="grid grid-cols-2 divide-x p-4">
-              <div className="pr-4">
-                <p className="text-xs text-muted-foreground">Estimated earnings</p>
-                <p className="mt-1 font-bold tabular-nums">
-                  {entriesQuery.isLoading ? '—' : formatCurrency(estimated)}
-                </p>
-              </div>
-              <div className="pl-4">
-                <p className="text-xs text-muted-foreground">Approved earnings</p>
-                <p className="mt-1 font-bold tabular-nums">
-                  {payrollQuery.isLoading ? '—' : formatCurrency(approvedEarnings)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+     
 
           {urgentOrders.length > 0 && (
             <section className="space-y-3" aria-labelledby="urgent-work-heading">
@@ -626,7 +606,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
                 <AlertTriangle className="h-4 w-4" aria-hidden="true" /> Urgent work
               </h2>
               {urgentOrders.slice(0, 2).map((order) => (
-                <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
+                <WorkerOrderCard key={order._id} order={order} />
               ))}
             </section>
           )}
@@ -635,7 +615,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
             <div className="flex items-end justify-between gap-3">
               <div>
                 <h2 id="mobile-assigned-orders-heading" className="font-semibold">
-                  My Assigned Orders
+                  MY JOBS
                 </h2>
                 <p className="text-sm text-muted-foreground">Your priority work</p>
               </div>
@@ -652,9 +632,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
             ) : (
               assignedOrders
                 .slice(0, 2)
-                .map((order) => (
-                  <WorkerOrderCard key={order._id} order={order} onAddWork={setWorkOrder} />
-                ))
+                .map((order) => <WorkerOrderCard key={order._id} order={order} />)
             )}
           </section>
 
@@ -671,7 +649,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
               <WorkerCardSkeleton count={1} />
             ) : entries.length === 0 ? (
               <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                You have not submitted production this month.
+                No production has been recorded for you this month.
               </p>
             ) : (
               entries
@@ -728,7 +706,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
         <section className="space-y-4">
           <SectionHeader
             title="My production"
-            description="Your current-month pieces, entry status, earnings, and available work"
+            description="Your current-month recorded pieces, earnings, and assigned work"
             href="/production-entries"
             label="View my entries"
           />
@@ -737,7 +715,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
             <Stat
               label="Monthly pieces"
               value={entriesQuery.isLoading ? '—' : (stats.submittedQuantity ?? 0)}
-              description="All submitted pieces"
+              description="All recorded pieces"
               icon={Shirt}
               highlight
             />
@@ -774,11 +752,9 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
           </div>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Recent submitted entries</CardTitle>
-              <Button asChild size="sm">
-                <Link href="/production-entries">
-                  <Plus className="h-4 w-4" /> Record production
-                </Link>
+              <CardTitle className="text-base">Recent production entries</CardTitle>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/production-entries">View history</Link>
               </Button>
             </CardHeader>
             <CardContent className="p-0">
@@ -788,7 +764,7 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
                 </div>
               ) : entries.length === 0 ? (
                 <p className="px-6 pb-6 text-sm text-muted-foreground">
-                  You have not submitted production this month.
+                  No production has been recorded for you this month.
                 </p>
               ) : (
                 <Table>
@@ -868,12 +844,6 @@ function WorkerPanel({ entriesQuery, ordersQuery, payrollQuery, notificationsQue
           </div>
         </section>
       )}
-
-      <ProductionEntryFormDialog
-        open={Boolean(workOrder)}
-        onOpenChange={(nextOpen) => !nextOpen && setWorkOrder(null)}
-        initialProductionOrderId={workOrder?._id}
-      />
     </div>
   );
 }
@@ -897,6 +867,8 @@ export default function DashboardPage() {
   const payrollRead = hasPermission('payroll.read_all') || hasPermission('payroll.read_own');
   const workerView = entryCreate && !entryReadAll;
   const productionView = orderRead && !workerView;
+  // Production Manager PWA: the shared install card also appears on the manager dashboard.
+  const managerView = productionView && isProductionManagerView(hasPermission);
 
   const invoices = useInvoices({ limit: 5 }, { enabled: invoiceRead });
   const clients = useClients({ enabled: invoiceRead && clientRead });
@@ -932,15 +904,15 @@ export default function DashboardPage() {
       label: 'New Production Order',
       icon: ClipboardList,
     },
-    entryCreate && {
-      href: '/production-entries',
+    canRecordProduction(hasPermission) && {
+      href: '/production-entries?record=true',
       label: 'Record Production',
       icon: ClipboardCheck,
     },
   ].filter(Boolean);
 
   return (
-    <div className="space-y-8">
+    <div className={workerView ? 'space-y-0' : 'space-y-8'}>
       <div className={workerView ? 'hidden md:block' : ''}>
         <PageHeader
           title="Dashboard"
@@ -980,6 +952,7 @@ export default function DashboardPage() {
       {invoiceRead && (
         <InvoicePanel query={invoices} clients={clients.data?.clients} canCreate={invoiceCreate} />
       )}
+      {managerView && <WorkerInstallCard />}
       {productionView && (
         <ProductionPanel
           ordersQuery={orders}

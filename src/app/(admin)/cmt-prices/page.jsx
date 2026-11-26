@@ -25,14 +25,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import VirtualTableBody from '@/components/ui/virtual-table-body';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/useToast';
@@ -288,9 +282,11 @@ export default function CmtPricesPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {displayed.map((entry) => (
-                  <TableRow key={entry._id}>
+              <VirtualTableBody
+                items={displayed}
+                colSpan={6}
+                renderRow={(entry, rowProps) => (
+                  <TableRow key={entry._id} {...rowProps}>
                     <TableCell className="font-mono font-medium">{entry.itemCode}</TableCell>
                     <TableCell>{entry.style}</TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -330,8 +326,8 @@ export default function CmtPricesPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
+                )}
+              />
             </Table>
           )}
         </CardContent>

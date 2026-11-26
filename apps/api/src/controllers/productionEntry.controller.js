@@ -4,8 +4,10 @@ const ProductionOrder = require('../models/productionOrder.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { hasPermission } = require('../services/permission.service');
 const {
-  submitProductionEntry,
+  recordProductionEntry,
+  reverseProductionEntry,
   reviewProductionEntry,
+  validateProductionDate,
 } = require('../services/productionEntry.service');
 
 const POPULATE_FIELDS = [
@@ -16,7 +18,10 @@ const POPULATE_FIELDS = [
     populate: { path: 'client', select: 'name' },
   },
   { path: 'worker', select: 'username email' },
+  { path: 'recordedBy', select: 'username email' },
   { path: 'reviewedBy', select: 'username email' },
+  { path: 'reversedBy', select: 'username email' },
+  { path: 'reversalOf', select: 'date quantity status' },
 ];
 
 function parsePositiveInteger(value) {
@@ -43,13 +48,18 @@ async function populateEntry(entry) {
   return entry;
 }
 
+// Manager-recorded production: the route requires production_entry.create AND
+// production_entry.approve, because every entry recorded here is approved immediately.
 exports.createProductionEntry = asyncHandler(async (req, res) => {
-  const { productionOrderId, date, quantity, notes } = req.body;
+  const { productionOrderId, workerId, date, quantity, notes } = req.body;
   const parsedQuantity = parsePositiveInteger(quantity);
   const parsedDate = parseDate(date);
 
   if (!mongoose.isValidObjectId(productionOrderId)) {
     return res.status(400).json({ success: false, message: 'Invalid production order identifier' });
+  }
+  if (!mongoose.isValidObjectId(workerId)) {
+    return res.status(400).json({ success: false, message: 'Please select a valid worker' });
   }
   if (!parsedDate) {
     return res.status(400).json({ success: false, message: 'Please provide a valid entry date' });
@@ -60,20 +70,20 @@ exports.createProductionEntry = asyncHandler(async (req, res) => {
       .json({ success: false, message: 'Quantity must be a positive whole number' });
   }
 
-  const productionEntry = await submitProductionEntry({
+  const productionEntry = await recordProductionEntry({
     productionOrderId,
-    workerId: req.user._id,
-    workerName: req.user.username ?? req.user.email ?? 'A worker',
+    workerId,
+    recorderId: req.user._id,
+    recorderName: req.user.username ?? req.user.email ?? 'A production manager',
     date: parsedDate,
     quantity: parsedQuantity,
     notes: typeof notes === 'string' ? notes.trim() : '',
-    allowUnassignedOrder: canReadAll(req.user),
   });
   await populateEntry(productionEntry);
 
   res.status(201).json({
     success: true,
-    message: 'Production entry submitted for review',
+    message: 'Production recorded and approved',
     productionEntry,
   });
 });
@@ -245,6 +255,7 @@ exports.updateProductionEntry = asyncHandler(async (req, res) => {
     const date = parseDate(req.body.date);
     if (!date)
       return res.status(400).json({ success: false, message: 'Please provide a valid entry date' });
+    validateProductionDate(date, order);
     updates.date = date;
   }
   if (req.body.notes !== undefined) {
@@ -297,3 +308,25 @@ async function review(req, res, decision) {
 
 exports.approveProductionEntry = asyncHandler((req, res) => review(req, res, 'APPROVED'));
 exports.rejectProductionEntry = asyncHandler((req, res) => review(req, res, 'REJECTED'));
+
+// Controlled correction: reverses an approved entry with a mandatory reason. The original is
+// kept for audit and a linked negative REVERSAL entry offsets progress and earnings. Managers
+// record a corrected entry through the normal create endpoint afterwards.
+exports.reverseProductionEntry = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ success: false, message: 'Invalid production entry identifier' });
+  }
+  const { original, reversalEntry } = await reverseProductionEntry({
+    entryId: req.params.id,
+    reverserId: req.user._id,
+    reverserName: req.user.username ?? req.user.email ?? 'A production manager',
+    reason: req.body?.reason,
+  });
+  await Promise.all([populateEntry(original), populateEntry(reversalEntry)]);
+  res.status(200).json({
+    success: true,
+    message: 'Production entry reversed',
+    productionEntry: original,
+    reversalEntry,
+  });
+});

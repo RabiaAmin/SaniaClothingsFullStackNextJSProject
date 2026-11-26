@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import productionEntryApi from '@/lib/api/productionEntry.api';
 import { PRODUCTION_ORDER_KEYS } from '@/hooks/useProductionOrders';
+import { PAYROLL_KEYS } from '@/hooks/usePayroll';
 
 export const PRODUCTION_ENTRY_KEYS = {
   all: ['production-entries'],
@@ -31,6 +32,7 @@ function invalidateProduction(queryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: PRODUCTION_ENTRY_KEYS.all }),
     queryClient.invalidateQueries({ queryKey: PRODUCTION_ORDER_KEYS.all }),
+    queryClient.invalidateQueries({ queryKey: PAYROLL_KEYS.all }),
   ]);
 }
 
@@ -63,5 +65,11 @@ export function useApproveProductionEntry() {
 export function useRejectProductionEntry() {
   return useEntryMutation(({ id, reviewNotes }) =>
     productionEntryApi.rejectProductionEntry(id, reviewNotes).then((response) => response.data)
+  );
+}
+
+export function useReverseProductionEntry() {
+  return useEntryMutation(({ id, reason }) =>
+    productionEntryApi.reverseProductionEntry(id, reason).then((response) => response.data)
   );
 }

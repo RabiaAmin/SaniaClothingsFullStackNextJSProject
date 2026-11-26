@@ -1,12 +1,13 @@
 'use client';
 
 import { useDeferredValue, useEffect, useState } from 'react';
-import { Check, ClipboardCheck, Pencil, Plus, Search, X } from 'lucide-react';
-import PermissionGuard from '@/components/auth/PermissionGuard';
+import { Check, ClipboardCheck, Pencil, Plus, Search, Undo2, X } from 'lucide-react';
 import EmptyState from '@/components/admin/EmptyState';
 import PageHeader from '@/components/admin/PageHeader';
 import TableSkeleton from '@/components/admin/TableSkeleton';
 import ProductionEntryFormDialog from '@/components/production/ProductionEntryFormDialog';
+import ProductionEntryAuditNote from '@/components/production/ProductionEntryAuditNote';
+import ProductionEntryReverseDialog from '@/components/production/ProductionEntryReverseDialog';
 import ProductionEntryReviewDialog from '@/components/production/ProductionEntryReviewDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,12 +32,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProductionEntries } from '@/hooks/useProductionEntries';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
+  canRecordProduction,
+  canReverseEntry,
+  canReverseProduction,
+  storedDateInputValue,
   PRODUCTION_ENTRY_STATUSES,
   productionEntryStatusLabel,
   productionEntryStatusVariant,
 } from '@/lib/productionEntries';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { WorkerCardSkeleton, WorkerEntryCard } from '@/components/worker/WorkerMobileCards';
+import { isProductionManagerView } from '@/lib/auth/productionViews';
 
 function SummaryCard({ label, value, description, compact = false }) {
   return (
@@ -46,7 +52,7 @@ function SummaryCard({ label, value, description, compact = false }) {
         <p
           className={
             compact
-              ? 'mt-1 text-lg font-semibold tabular-nums sm:text-2xl'
+              ? 'mt-1 text-lg font-semibold tabular-nums sm:text-xl'
               : 'mt-1 text-2xl font-semibold tabular-nums'
           }
         >
@@ -72,6 +78,12 @@ export default function ProductionEntriesPage() {
     hasPermission('production_entry.read_own') && !hasPermission('production_entry.read_all');
   const isMobile = useMediaQuery('(max-width: 767px)');
   const showWorkerMobile = isWorkerView && isMobile;
+  // Production Manager PWA: actionable entry cards instead of the dense table.
+  const showManagerMobile = !isWorkerView && isMobile && isProductionManagerView(hasPermission);
+  const canRecord = canRecordProduction(hasPermission);
+  const canReverse = canReverseProduction(hasPermission);
+  const [reversingEntry, setReversingEntry] = useState(null);
+  const [correction, setCorrection] = useState(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
@@ -90,6 +102,7 @@ export default function ProductionEntriesPage() {
   const stats = data?.stats ?? {};
 
   useEffect(() => {
+    if (!canRecord) return undefined;
     function openEntryForm() {
       setFormOpen(true);
       if (window.location.search.includes('record=true')) {
@@ -100,13 +113,11 @@ export default function ProductionEntriesPage() {
     window.addEventListener('open-production-entry', openEntryForm);
     if (new URLSearchParams(window.location.search).get('record') === 'true') openEntryForm();
     return () => window.removeEventListener('open-production-entry', openEntryForm);
-  }, []);
+  }, [canRecord]);
 
+  // Workers are read-only. Managers may correct historical PENDING entries before review.
   function canEdit(entry) {
-    if (entry.status !== 'PENDING') return false;
-    if (hasPermission('production_entry.update_all')) return true;
-    const workerId = entry.worker?._id ?? entry.worker;
-    return hasPermission('production_entry.update_own') && workerId === user?._id;
+    return entry.status === 'PENDING' && hasPermission('production_entry.update_all');
   }
 
   function canReview(entry, permission) {
@@ -125,28 +136,19 @@ export default function ProductionEntriesPage() {
         title="Production Entries"
         description={
           hasPermission('production_entry.read_all')
-            ? 'Review worker output and approve quantities that count toward production'
-            : 'Record your completed pieces and track approval and earnings'
+            ? 'Record verified worker production and review historical pending entries'
+            : 'Production recorded for you by your production manager, with earnings'
         }
         action={
-          <PermissionGuard permission="production_entry.create">
-            <Button
-              className={showWorkerMobile ? 'h-11 w-full sm:w-auto' : ''}
-              onClick={() => setFormOpen(true)}
-            >
+          canRecord && (
+            <Button onClick={() => setFormOpen(true)}>
               <Plus className="h-4 w-4" /> Record Production
             </Button>
-          </PermissionGuard>
+          )
         }
       />
 
-      <div className={showWorkerMobile ? 'grid grid-cols-3 gap-2' : 'grid gap-4 sm:grid-cols-3'}>
-        <SummaryCard
-          label="Pending review"
-          value={stats.pendingEntries ?? 0}
-          description="Entries not yet counted"
-          compact={showWorkerMobile}
-        />
+      <div className='grid sm:grid-cols-2 gap-2'S>
         <SummaryCard
           label="Approved pieces"
           value={stats.approvedQuantity ?? 0}
@@ -171,7 +173,10 @@ export default function ProductionEntriesPage() {
               className="pl-9"
               placeholder="Search PO number or production description"
             />
-          </div>
+        </div>
+        {
+        showManagerMobile && (
+
           <Select value={status} onValueChange={(value) => resetPage(() => setStatus(value))}>
             <SelectTrigger>
               <SelectValue placeholder="All statuses" />
@@ -185,6 +190,8 @@ export default function ProductionEntriesPage() {
               ))}
             </SelectContent>
           </Select>
+        )
+        }
         </CardContent>
       </Card>
 
@@ -204,7 +211,11 @@ export default function ProductionEntriesPage() {
             <EmptyState
               icon={ClipboardCheck}
               title="No production entries found"
-              description="Record production or adjust the current filters."
+              description={
+                isWorkerView
+                  ? 'Production recorded for you will appear here.'
+                  : 'Record production or adjust the current filters.'
+              }
             />
           ) : (
             entries.map((entry) => (
@@ -218,7 +229,82 @@ export default function ProductionEntriesPage() {
         </div>
       )}
 
-      {!showWorkerMobile && (
+      {showManagerMobile && (
+        <div className="space-y-3" aria-live="polite" data-testid="manager-entry-cards">
+          {isLoading ? (
+            <WorkerCardSkeleton />
+          ) : error ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {error.message}
+            </p>
+          ) : entries.length === 0 ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="No production entries found"
+              description="Record production or adjust the current filters."
+            />
+          ) : (
+            entries.map((entry) => {
+              const poNumber = entry.productionOrder?.poNumber;
+              const actions = [
+                canEdit(entry) && (
+                  <Button
+                    key="edit"
+                    variant="outline"
+                    className="h-11"
+                    aria-label={`Edit entry for ${poNumber}`}
+                    onClick={() => setEditingEntry(entry)}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" /> Edit
+                  </Button>
+                ),
+                canReview(entry, 'production_entry.approve') && (
+                  <Button
+                    key="approve"
+                    variant="outline"
+                    className="h-11"
+                    aria-label={`Approve entry for ${poNumber}`}
+                    onClick={() => setReview({ entry, decision: 'APPROVED' })}
+                  >
+                    <Check className="h-4 w-4 text-emerald-600" aria-hidden="true" /> Approve
+                  </Button>
+                ),
+                canReview(entry, 'production_entry.reject') && (
+                  <Button
+                    key="reject"
+                    variant="outline"
+                    className="h-11"
+                    aria-label={`Reject entry for ${poNumber}`}
+                    onClick={() => setReview({ entry, decision: 'REJECTED' })}
+                  >
+                    <X className="h-4 w-4 text-destructive" aria-hidden="true" /> Reject
+                  </Button>
+                ),
+                canReverse && canReverseEntry(entry, user?._id) && (
+                  <Button
+                    key="reverse"
+                    variant="outline"
+                    className="h-11"
+                    aria-label={`Reverse entry for ${poNumber}`}
+                    onClick={() => setReversingEntry(entry)}
+                  >
+                    <Undo2 className="h-4 w-4" aria-hidden="true" /> Reverse
+                  </Button>
+                ),
+              ].filter(Boolean);
+              return (
+                <WorkerEntryCard
+                  key={entry._id}
+                  entry={entry}
+                  actions={actions.length > 0 ? actions : null}
+                />
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {!showWorkerMobile && !showManagerMobile && (
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
@@ -231,7 +317,11 @@ export default function ProductionEntriesPage() {
               <EmptyState
                 icon={ClipboardCheck}
                 title="No production entries found"
-                description="Record production or adjust the current filters."
+                description={
+                  isWorkerView
+                    ? 'Production recorded for you will appear here.'
+                    : 'Record production or adjust the current filters.'
+                }
                 className="m-6"
               />
             ) : (
@@ -294,6 +384,7 @@ export default function ProductionEntriesPage() {
                               {entry.reviewNotes}
                             </p>
                           )}
+                          <ProductionEntryAuditNote entry={entry} />
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -326,6 +417,16 @@ export default function ProductionEntriesPage() {
                               onClick={() => setReview({ entry, decision: 'REJECTED' })}
                             >
                               <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                          {canReverse && canReverseEntry(entry, user?._id) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Reverse entry for ${entry.productionOrder?.poNumber}`}
+                              onClick={() => setReversingEntry(entry)}
+                            >
+                              <Undo2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
@@ -363,7 +464,23 @@ export default function ProductionEntriesPage() {
         </div>
       )}
 
-      <ProductionEntryFormDialog open={formOpen} onOpenChange={setFormOpen} />
+      {canRecord && <ProductionEntryFormDialog open={formOpen} onOpenChange={setFormOpen} />}
+      {canReverse && (
+        <>
+          <ProductionEntryReverseDialog
+            entry={reversingEntry}
+            onOpenChange={(nextOpen) => !nextOpen && setReversingEntry(null)}
+            onRecordCorrection={setCorrection}
+          />
+          <ProductionEntryFormDialog
+            open={Boolean(correction)}
+            onOpenChange={(nextOpen) => !nextOpen && setCorrection(null)}
+            initialProductionOrderId={correction?.productionOrder?._id ?? ''}
+            initialWorkerId={correction?.worker?._id ?? ''}
+            initialDate={storedDateInputValue(correction?.date)}
+          />
+        </>
+      )}
       <ProductionEntryFormDialog
         open={Boolean(editingEntry)}
         onOpenChange={(nextOpen) => !nextOpen && setEditingEntry(null)}

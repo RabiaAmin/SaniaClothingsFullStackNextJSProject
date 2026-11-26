@@ -209,6 +209,15 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
     // Aggregation pipelines are not cast by Mongoose, so store the ObjectId explicitly.
     filter.client = new mongoose.Types.ObjectId(req.query.clientId);
   }
+  if (req.query.recordable === 'true') {
+    // Orders that can receive manager-recorded production: open and with assigned workers.
+    // Combined with search/page so the recording selector can reach every open order.
+    filter.$and = [
+      ...(filter.$and ?? []),
+      { status: { $nin: ['COMPLETED', 'CANCELLED'] } },
+      { 'assignedWorkers.0': { $exists: true } },
+    ];
+  }
   if (isWorkerScopedRequest(req)) {
     filter.$and = [...(filter.$and ?? []), { assignedWorkers: req.user._id }];
   }

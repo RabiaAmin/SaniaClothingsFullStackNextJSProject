@@ -9,9 +9,9 @@ import {
   Clock3,
   Package,
   Pencil,
-  Plus,
   XCircle,
 } from 'lucide-react';
+import ProductionEntryAuditNote from '@/components/production/ProductionEntryAuditNote';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,7 +36,9 @@ function EntryStatusIcon({ status }) {
   return <Clock3 className="h-4 w-4" aria-hidden="true" />;
 }
 
-export function WorkerOrderCard({ order, onAddWork }) {
+// Phone order card shared by the Worker PWA (read-only, the default) and the Production Manager
+// PWA, which passes showAssignment and manager actions. Production is recorded by managers only.
+export function WorkerOrderCard({ order, showAssignment = false, actions = null }) {
   const tracking = productionOrderTracking(order);
 
   return (
@@ -107,24 +109,39 @@ export function WorkerOrderCard({ order, onAddWork }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button asChild variant="outline" className="h-11">
+        {showAssignment && (
+          <div className="text-sm">
+            <p className="text-xs text-muted-foreground">Assigned workers</p>
+            {(order.assignedWorkers ?? []).length === 0 ? (
+              <p className="mt-1 font-medium text-muted-foreground">Unassigned</p>
+            ) : (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {order.assignedWorkers.map((worker) => (
+                  <Badge key={worker?._id ?? worker} variant="secondary">
+                    {worker?.username ?? worker?.email ?? 'Worker'}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={actions ? 'grid grid-cols-2 gap-2' : ''}>
+          <Button asChild variant="outline" className="h-11 w-full">
             <Link href={`/production-orders/${order._id}`}>
               View details <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </Button>
-          {onAddWork && tracking.remainingQuantity > 0 && tracking.status !== 'CANCELLED' && (
-            <Button className="h-11" onClick={() => onAddWork(order)}>
-              <Plus className="h-4 w-4" aria-hidden="true" /> Add Work
-            </Button>
-          )}
+          {actions}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-export function WorkerEntryCard({ entry, onEdit, showItemCode = true }) {
+// Phone entry card. Workers see it read-only; managers pass actions (review legacy pending
+// entries, edit pending entries, reverse approved entries).
+export function WorkerEntryCard({ entry, onEdit, showItemCode = true, actions = null }) {
   return (
     <Card data-testid={`worker-entry-card-${entry._id}`}>
       <CardContent className="space-y-3 p-4">
@@ -174,6 +191,8 @@ export function WorkerEntryCard({ entry, onEdit, showItemCode = true }) {
           </div>
         </dl>
 
+        <ProductionEntryAuditNote entry={entry} />
+
         {(entry.notes || entry.reviewNotes) && (
           <div className="space-y-1 rounded-md bg-muted/50 p-3 text-sm">
             {entry.notes && (
@@ -199,6 +218,7 @@ export function WorkerEntryCard({ entry, onEdit, showItemCode = true }) {
             <Pencil className="h-4 w-4" aria-hidden="true" /> Edit pending entry
           </Button>
         )}
+        {actions && <div className="grid grid-cols-2 gap-2">{actions}</div>}
       </CardContent>
     </Card>
   );

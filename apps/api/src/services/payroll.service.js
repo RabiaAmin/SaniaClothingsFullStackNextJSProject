@@ -99,6 +99,10 @@ function buildPayrollReport(entries, period) {
       quantity,
       unitRate,
       amount,
+      // REVERSAL rows carry negative quantity/amount and offset an earlier entry in the period
+      // in which the reversal happened; the original period's rows are never rewritten.
+      entryType: entry.entryType ?? 'PRODUCTION',
+      reversalOf: entry.reversalOf ? String(entry.reversalOf) : null,
     };
 
     if (!workers.has(workerId)) {
@@ -149,7 +153,7 @@ async function findPayrollEntries(period, workerId) {
   if (workerId) filter.worker = workerId;
 
   return ProductionEntry.find(filter)
-    .select('productionOrder worker date quantity unitRate status')
+    .select('productionOrder worker date quantity unitRate status entryType reversalOf')
     .populate({
       path: 'productionOrder',
       select: 'poNumber productionDescription product',

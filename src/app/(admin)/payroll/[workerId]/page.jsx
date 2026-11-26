@@ -239,6 +239,9 @@ function PayrollView() {
                   <td className="border border-gray-300 px-3 py-2">{formatDate(entry.date)}</td>
                   <td className="border border-gray-300 px-3 py-2 font-mono font-semibold">
                     {entry.poNumber}
+                    {entry.entryType === 'REVERSAL' && (
+                      <span className="ml-1 font-sans text-xs font-normal">(reversal)</span>
+                    )}
                   </td>
 
                   <td className="border border-gray-300 px-3 py-2 text-right tabular-nums">

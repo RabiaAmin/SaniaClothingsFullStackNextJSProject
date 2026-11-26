@@ -14,14 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import VirtualTableBody from '@/components/ui/virtual-table-body';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -328,9 +322,11 @@ export default function ClientsPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {displayed.map((c) => (
-                  <TableRow key={c._id}>
+              <VirtualTableBody
+                items={displayed}
+                colSpan={6}
+                renderRow={(c, rowProps) => (
+                  <TableRow key={c._id} {...rowProps}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell className="text-muted-foreground">{c.email ?? '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{c.phone ?? '—'}</TableCell>
@@ -380,8 +376,8 @@ export default function ClientsPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
+                )}
+              />
             </Table>
           )}
         </CardContent>

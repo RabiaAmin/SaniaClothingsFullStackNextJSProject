@@ -11,6 +11,8 @@ const productionEntryApi = {
     axiosInstance.patch(`${PRODUCTION_ENTRIES}/${id}/approve`, { reviewNotes }),
   rejectProductionEntry: (id, reviewNotes) =>
     axiosInstance.patch(`${PRODUCTION_ENTRIES}/${id}/reject`, { reviewNotes }),
+  reverseProductionEntry: (id, reason) =>
+    axiosInstance.patch(`${PRODUCTION_ENTRIES}/${id}/reverse`, { reason }),
 };
 
 export default productionEntryApi;
